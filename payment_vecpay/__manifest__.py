@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+
 {
     'name': 'Vector 綠界金流模組2',
     'version': '1.0',
