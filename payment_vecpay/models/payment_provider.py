@@ -23,8 +23,19 @@ class PaymentProvider(models.Model):
         string="Merchant Hash Key")
     ecpay_hash_iv = fields.Char(
         string="Merchant Hash IV")
+    ecpay_credit = fields.Boolean(string="啟用信用卡付款", default=True)
+    ecpay_webatm = fields.Boolean(string="啟用網路ATM付款", default=True)
+    ecpay_atm = fields.Boolean(string="啟用自動櫃員機付款", default=True)
+    ecpay_cvs = fields.Boolean(string="啟用超商代碼付款", default=True)
+    ecpay_barcode = fields.Boolean(string="啟用超商條碼付款", default=True)
+    is_any_payment_selected = fields.Boolean(string="是否选择付款方式", compute="_compute_is_any_payment_selected", store=True)
+    dummy_field = fields.Char(string="請選擇一項付款方式！")
 
     #=== BUSINESS METHODS ===#
+    @api.depends('ecpay_credit', 'ecpay_webatm', 'ecpay_atm', 'ecpay_cvs', 'ecpay_barcode')
+    def _compute_is_any_payment_selected(self):
+        for record in self:
+            record.is_any_payment_selected = any([record.ecpay_credit, record.ecpay_webatm, record.ecpay_atm, record.ecpay_cvs, record.ecpay_barcode])
 
     @api.model
     def _get_compatible_providers(self, *args, currency_id=None, **kwargs):
