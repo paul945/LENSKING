@@ -9,7 +9,6 @@
             <input type="hidden" name="CustomField1" t-att-value="CustomField1"/>
             <input type="hidden" name="CustomField2" t-att-value="CustomField2"/>
             <input type="hidden" name="EncryptType" t-att-value="EncryptType"/>
-            <input type="hidden" name="IgnorePayment" t-att-value="IgnorePayment"/>
             <input type="hidden" name="ItemName" t-att-value="ItemName"/>
             <input type="hidden" name="ItemURL" t-att-value="ItemURL"/>
             <input type="hidden" name="MerchantID" t-att-value="MerchantID"/>

@@ -51,14 +51,6 @@ class PaymentTransaction(models.Model):
 		
         itemURL = "user/center/premium";
         lanStr=""
-        ignorePayment=""
-        ignorePayment += "" if self.provider_id.ecpay_credit else "Credit"
-        ignorePayment += "" if self.provider_id.ecpay_webatm else "#WebATM"
-        ignorePayment += "" if self.provider_id.ecpay_atm else "#ATM"
-        ignorePayment += "" if self.provider_id.ecpay_cvs else "#CVS"
-        ignorePayment += "" if self.provider_id.ecpay_barcode else "#BARCODE"
-        ignorePayment += "#GooglePay"
-        ignorePayment = ignorePayment.lstrip('#')
 
         ecpay_post = {
             'ChoosePayment': 'ALL',
@@ -66,7 +58,6 @@ class PaymentTransaction(models.Model):
             'CustomField1': self.reference,
             'CustomField2': '',
             'EncryptType': '1',
-            'IgnorePayment': ignorePayment,
             'ItemName': f"{self.company_id.name}: {self.reference}",
             'ItemURL': webURL + lanStr + itemURL,
             'MerchantID': self.provider_id._get_ecpay_config().get('MerchantID'),
@@ -81,9 +72,8 @@ class PaymentTransaction(models.Model):
             'TradeDesc': 'Odoo付款',
         }
         CheckMacValue = {'CheckMacValue':self.generate_check_value(ecpay_post)}
-        #_logger.info("paypal CheckMacValue = " + self.generate_check_value(ecpay_post))
+        # _logger.info("paypal CheckMacValue = " + CheckMacValue)
         ecpay_post.update(CheckMacValue)
-            
 
         resultJson = {
             'address1': self.partner_address,
