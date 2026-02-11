@@ -2,7 +2,6 @@
 <odoo>
     <data noupdate="1">
         
-        <!-- 自動化動作 1：付款成功發送 LINE 通知給客戶 -->
         <record id="action_ecpay_payment_success_notify_customer" model="base.automation">
             <field name="name">綠界付款成功 - 通知客戶</field>
             <field name="model_id" ref="sale.model_sale_order"/>
@@ -11,13 +10,9 @@
             <field name="trigger">on_write</field>
             <field name="filter_domain">[('payment_state', '=', 'paid')]</field>
             <field name="filter_pre_domain">[('payment_state', '!=', 'paid')]</field>
-            <field name="code">
-# LINE Bot 通知將在 Phase 2 整合
-log('TODO: 發送 LINE 通知給客戶')
-            </field>
+            <field name="code">log('TODO: Phase 2 - LINE notification')</field>
         </record>
 
-        <!-- 自動化動作 2：付款成功通知客服準備器材 -->
         <record id="action_ecpay_payment_success_notify_staff" model="base.automation">
             <field name="name">綠界付款成功 - 通知客服</field>
             <field name="model_id" ref="sale.model_sale_order"/>
@@ -26,53 +21,8 @@ log('TODO: 發送 LINE 通知給客戶')
             <field name="trigger">on_write</field>
             <field name="filter_domain">[('payment_state', '=', 'paid')]</field>
             <field name="filter_pre_domain">[('payment_state', '!=', 'paid')]</field>
-            <field name="code">
-# 建立待辦事項
-activity_type = env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-if activity_type and record.rental_start_date:
-    env['mail.activity'].create({
-        'activity_type_id': activity_type.id,
-        'summary': '準備器材 - %s' % record.name,
-        'note': '訂單已付款，請準備器材',
-        'res_id': record.id,
-        'res_model_id': env['ir.model']._get('sale.order').id,
-        'user_id': env.user.id,
-        'date_deadline': record.rental_start_date,
-    })
-            </field>
-        </record>
-
-        <!-- 自動化動作 3：ATM 虛擬帳號產生後通知客戶 -->
-        <record id="action_ecpay_atm_account_notify" model="base.automation">
-            <field name="name">ATM 虛擬帳號產生 - 通知客戶</field>
-            <field name="model_id" ref="sale.model_sale_order"/>
-            <field name="state">code</field>
-            <field name="active" eval="True"/>
-            <field name="trigger">on_write</field>
-            <field name="filter_domain">[('atm_v_account', '!=', False)]</field>
-            <field name="filter_pre_domain">[('atm_v_account', '=', False)]</field>
-            <field name="code">
-# LINE Bot 通知將在 Phase 2 整合
-log('TODO: 發送 ATM 資訊到 LINE')
-            </field>
-        </record>
-
-        <!-- 自動化動作 4：超商繳費代碼產生後通知客戶 -->
-        <record id="action_ecpay_cvs_code_notify" model="base.automation">
-            <field name="name">超商繳費代碼產生 - 通知客戶</field>
-            <field name="model_id" ref="sale.model_sale_order"/>
-            <field name="state">code</field>
-            <field name="active" eval="True"/>
-            <field name="trigger">on_write</field>
-            <field name="filter_domain">[('cvs_payment_no', '!=', False)]</field>
-            <field name="filter_pre_domain">[('cvs_payment_no', '=', False)]</field>
-            <field name="code">
-# LINE Bot 通知將在 Phase 2 整合
-log('TODO: 發送超商代碼到 LINE')
-            </field>
+            <field name="code">log('TODO: Phase 2 - Create activity')</field>
         </record>
 
     </data>
 </odoo>
-```
-
