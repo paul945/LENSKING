@@ -175,7 +175,8 @@ class SaleOrder(models.Model):
             api_url = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
         
         # 取得網站基礎 URL
-        base_url = IrConfigParameter.get_param('web.base.url')
+        # 使用固定的官方網域，避免取到錯誤的網址
+        base_url = 'https://www.lensking.com.tw'
         
         # 準備付款資料
         from datetime import datetime
