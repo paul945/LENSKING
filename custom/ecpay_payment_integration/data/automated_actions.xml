@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        
+        <!-- 自動化動作 1：付款成功發送 LINE 通知給客戶 -->
+        <record id="action_ecpay_payment_success_notify_customer" model="base.automation">
+            <field name="name">綠界付款成功 - 通知客戶</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="state">code</field>
+            <field name="active" eval="True"/>
+            
+            <!-- 觸發條件：payment_state 變更為 'paid' -->
+            <field name="trigger">on_write</field>
+            <field name="filter_domain">[('payment_state', '=', 'paid')]</field>
+            <field name="filter_pre_domain">[('payment_state', '!=', 'paid')]</field>
+            
+            <!-- 執行的程式碼 -->
+            <field name="code">
+# 這裡整合 LINE Bot API 發送通知
+# 
+# 範例訊息：
+# """
+# 🎉 付款成功！
+# 
+# 訂單編號：{record.name}
+# 付款金額：NT$ {record.amount_total}
+# 付款時間：{record.payment_date}
+# 
+# 📅 取件資訊
+# 日期：{record.rental_start_date}
+# 地點：桃園市中壢區義民路一段129號
+# 
+# 期待您的光臨！
+# """
+
+# 暫時用 Email 通知（之後改成 LINE）
+if record.line_user_id:
+    # 如果有 LINE User ID，之後整合 LINE Bot API
+    log('TODO: 發送 LINE 通知給客戶')
+else:
+    # 發送 Email
+    if record.partner_id.email:
+        template = env.ref('ecpay_payment_integration.email_template_payment_success', raise_if_not_found=False)
+        if template:
+            template.send_mail(record.id, force_send=True)
+            </field>
+        </record>
+
+        <!-- 自動化動作 2：付款成功通知客服準備器材 -->
+        <record id="action_ecpay_payment_success_notify_staff" model="base.automation">
+            <field name="name">綠界付款成功 - 通知客服</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="state">code</field>
+            <field name="active" eval="True"/>
+            
+            <!-- 觸發條件：payment_state 變更為 'paid' -->
+            <field name="trigger">on_write</field>
+            <field name="filter_domain">[('payment_state', '=', 'paid')]</field>
+            <field name="filter_pre_domain">[('payment_state', '!=', 'paid')]</field>
+            
+            <!-- 執行的程式碼 -->
+            <field name="code">
+# 建立待辦事項給客服
+# 提醒準備器材
+
+activity_type = env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+if activity_type:
+    env['mail.activity'].create({
+        'activity_type_id': activity_type.id,
+        'summary': f'準備器材 - {record.name}',
+        'note': f"""
+            <p><strong>訂單已付款，請準備器材</strong></p>
+            <ul>
+                <li>訂單編號：{record.name}</li>
+                <li>客戶：{record.partner_id.name}</li>
+                <li>取件日期：{record.rental_start_date}</li>
+                <li>器材清單：請查看訂單明細</li>
+            </ul>
+        """,
+        'res_id': record.id,
+        'res_model_id': env['ir.model']._get('sale.order').id,
+        'user_id': env.user.id,  # 指派給當前使用者
+        'date_deadline': record.rental_start_date,
+    })
+            </field>
+        </record>
+
+        <!-- 自動化動作 3：ATM 虛擬帳號產生後通知客戶 -->
+        <record id="action_ecpay_atm_account_notify" model="base.automation">
+            <field name="name">ATM 虛擬帳號產生 - 通知客戶</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="state">code</field>
+            <field name="active" eval="True"/>
+            
+            <!-- 觸發條件：atm_v_account 有值 -->
+            <field name="trigger">on_write</field>
+            <field name="filter_domain">[('atm_v_account', '!=', False)]</field>
+            <field name="filter_pre_domain">[('atm_v_account', '=', False')]</field>
+            
+            <!-- 執行的程式碼 -->
+            <field name="code">
+# 發送 ATM 虛擬帳號資訊給客戶
+# 
+# 範例訊息：
+# """
+# 🏦 ATM 虛擬帳號
+# 
+# 訂單編號：{record.name}
+# 銀行代碼：{record.atm_bank_code}
+# 虛擬帳號：{record.atm_v_account}
+# 繳費期限：{record.atm_expire_date}
+# 應繳金額：NT$ {record.amount_total}
+# 
+# ⚠️ 請在期限內完成轉帳
+# 轉帳後系統會自動確認訂單
+# """
+
+if record.line_user_id:
+    # 之後整合 LINE Bot API
+    log('TODO: 發送 ATM 資訊到 LINE')
+else:
+    # 暫時用 Email
+    if record.partner_id.email:
+        log('發送 ATM 資訊 Email')
+            </field>
+        </record>
+
+        <!-- 自動化動作 4：超商繳費代碼產生後通知客戶 -->
+        <record id="action_ecpay_cvs_code_notify" model="base.automation">
+            <field name="name">超商繳費代碼產生 - 通知客戶</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="state">code</field>
+            <field name="active" eval="True"/>
+            
+            <!-- 觸發條件：cvs_payment_no 有值 -->
+            <field name="trigger">on_write</field>
+            <field name="filter_domain">[('cvs_payment_no', '!=', False)]</field>
+            <field name="filter_pre_domain">[('cvs_payment_no', '=', False)]</field>
+            
+            <!-- 執行的程式碼 -->
+            <field name="code">
+# 發送超商繳費代碼給客戶
+# 
+# 範例訊息：
+# """
+# 🏪 超商繳費代碼
+# 
+# 訂單編號：{record.name}
+# 繳費代碼：{record.cvs_payment_no}
+# 繳費期限：{record.cvs_expire_date}
+# 應繳金額：NT$ {record.amount_total}
+# 
+# 可至以下超商繳費：
+# 7-ELEVEN、全家、萊爾富、OK
+# 
+# ⚠️ 請在期限內完成繳費
+# """
+
+if record.line_user_id:
+    # 之後整合 LINE Bot API
+    log('TODO: 發送超商代碼到 LINE')
+else:
+    # 暫時用 Email
+    if record.partner_id.email:
+        log('發送超商代碼 Email')
+            </field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        
+        <!-- 擴充租賃訂單表單視圖 -->
+        <record id="view_sale_order_form_ecpay" model="ir.ui.view">
+            <field name="name">sale.order.form.ecpay</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_order_form"/>
+            <field name="arch" type="xml">
+                
+                <!-- 在 partner_id 後面加入付款狀態 -->
+                <xpath expr="//field[@name='partner_id']" position="after">
+                    <field name="payment_state" 
+                           widget="badge" 
+                           decoration-success="payment_state == 'paid'"
+                           decoration-warning="payment_state == 'waiting_payment'"
+                           decoration-danger="payment_state == 'failed'"
+                    />
+                    <field name="source_channel"/>
+                </xpath>
+
+                <!-- 加入綠界付款資訊頁籤 -->
+                <xpath expr="//notebook" position="inside">
+                    <page string="💳 付款資訊" name="payment_info">
+                        <group>
+                            <group string="綠界交易資訊">
+                                <field name="payment_transaction_id" readonly="1"/>
+                                <field name="payment_method" readonly="1"/>
+                                <field name="payment_date" readonly="1"/>
+                                <field name="payment_auto_registered" readonly="1"/>
+                                <field name="payment_manual_verified"/>
+                            </group>
+                            
+                            <group string="ATM 付款資訊" attrs="{'invisible': [('payment_method', 'not in', ['atm', 'web_atm'])]}">
+                                <field name="atm_bank_code" readonly="1"/>
+                                <field name="atm_v_account" readonly="1"/>
+                                <field name="atm_expire_date" readonly="1"/>
+                            </group>
+                            
+                            <group string="超商付款資訊" attrs="{'invisible': [('payment_method', 'not in', ['cvs', 'barcode'])]}">
+                                <field name="cvs_payment_no" readonly="1"/>
+                                <field name="cvs_expire_date" readonly="1"/>
+                            </group>
+                            
+                            <group string="LINE 整合">
+                                <field name="line_user_id"/>
+                            </group>
+                        </group>
+                        
+                        <group>
+                            <field name="payment_note" colspan="2"/>
+                        </group>
+                        
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_send_payment_link" 
+                                    type="object" 
+                                    string="發送付款連結"
+                                    class="oe_stat_button" 
+                                    icon="fa-link"
+                                    attrs="{'invisible': [('payment_state', 'in', ['paid', 'waiting_payment'])]}"/>
+                            
+                            <button name="action_verify_payment_manually" 
+                                    type="object" 
+                                    string="人工覆核"
+                                    class="oe_stat_button" 
+                                    icon="fa-check"
+                                    attrs="{'invisible': ['|', ('payment_state', '!=', 'paid'), ('payment_manual_verified', '=', True)]}"/>
+                        </div>
+                    </page>
+                </xpath>
+
+            </field>
+        </record>
+
+        <!-- 擴充租賃訂單樹狀視圖 -->
+        <record id="view_sale_order_tree_ecpay" model="ir.ui.view">
+            <field name="name">sale.order.tree.ecpay</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_order_tree"/>
+            <field name="arch" type="xml">
+                
+                <!-- 在狀態欄位後面加入付款狀態 -->
+                <xpath expr="//field[@name='state']" position="after">
+                    <field name="payment_state" 
+                           widget="badge"
+                           decoration-success="payment_state == 'paid'"
+                           decoration-warning="payment_state == 'waiting_payment'"
+                           decoration-danger="payment_state == 'failed'"
+                    />
+                </xpath>
+
+            </field>
+        </record>
+
+        <!-- 擴充搜尋視圖 -->
+        <record id="view_sale_order_search_ecpay" model="ir.ui.view">
+            <field name="name">sale.order.search.ecpay</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+            <field name="arch" type="xml">
+                
+                <!-- 加入付款狀態篩選 -->
+                <xpath expr="//filter[@name='my_sale_orders_filter']" position="after">
+                    <separator/>
+                    <filter string="未付款" name="not_paid" domain="[('payment_state', '=', 'not_paid')]"/>
+                    <filter string="等待付款" name="waiting_payment" domain="[('payment_state', '=', 'waiting_payment')]"/>
+                    <filter string="已付款" name="paid" domain="[('payment_state', '=', 'paid')]"/>
+                    <filter string="付款失敗" name="failed" domain="[('payment_state', '=', 'failed')]"/>
+                    <separator/>
+                    <filter string="LINE Bot 訂單" name="line_bot" domain="[('source_channel', '=', 'line_bot')]"/>
+                    <filter string="自動對帳" name="auto_registered" domain="[('payment_auto_registered', '=', True)]"/>
+                </xpath>
+
+                <!-- 加入群組 -->
+                <xpath expr="//group" position="inside">
+                    <filter string="付款狀態" name="group_payment_state" context="{'group_by': 'payment_state'}"/>
+                    <filter string="付款方式" name="group_payment_method" context="{'group_by': 'payment_method'}"/>
+                    <filter string="訂單來源" name="group_source_channel" context="{'group_by': 'source_channel'}"/>
+                </xpath>
+
+            </field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- 綠界 API 金鑰設定 -->
+        
+        <!-- 特店編號 -->
+        <record id="ecpay_merchant_id" model="ir.config_parameter">
+            <field name="key">ecpay.merchant_id</field>
+            <field name="value">3031219</field>
+        </record>
+
+        <!-- HashKey -->
+        <record id="ecpay_hash_key" model="ir.config_parameter">
+            <field name="key">ecpay.hash_key</field>
+            <field name="value">VRnWnVYzZiMiL5KU</field>
+        </record>
+
+        <!-- HashIV -->
+        <record id="ecpay_hash_iv" model="ir.config_parameter">
+            <field name="key">ecpay.hash_iv</field>
+            <field name="value">aymWrNfsJXa83Zfb</field>
+        </record>
+
+        <!-- 測試模式（True/False） -->
+        <record id="ecpay_test_mode" model="ir.config_parameter">
+            <field name="key">ecpay.test_mode</field>
+            <field name="value">False</field>
+        </record>
+
+        <!-- 
+            注意：
+            1. 上面使用的是您的正式環境金鑰
+            2. 如果要測試，請將 ecpay.test_mode 改為 True
+            3. 測試環境金鑰：
+               - MerchantID: 2000132
+               - HashKey: 5294y06JbISpM5x9
+               - HashIV: v77hoKGq4kWxNNIS
+        -->
+
+    </data>
+</odoo>
