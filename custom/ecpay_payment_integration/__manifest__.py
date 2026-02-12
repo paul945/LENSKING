@@ -34,7 +34,7 @@
     'data': [
         'security/ir.model.access.csv',
         'data/system_parameters.xml',
-        # 'data/automated_actions.xml',  # 暫時停用，Phase 2 再啟用
+        'data/automated_actions.xml',  # 已修正，重新啟用
         'views/rental_order_views.xml',
     ],
     

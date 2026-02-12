@@ -609,3 +609,192 @@ class ECPayPaymentPageController(http.Controller):
         
         # SHA256 加密並轉大寫
         return hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
+
+
+class ECPaySuccessPageController(http.Controller):
+    """
+    付款成功頁面 Controller
+    """
+
+    @http.route('/payment/success', type='http', auth='public', methods=['GET', 'POST'], csrf=False)
+    def payment_success_page(self, **kwargs):
+        """
+        顯示付款成功頁面
+        """
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>付款成功 - 時光幻鏡</title>
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    padding: 20px;
+                }
+                .container {
+                    background: white;
+                    border-radius: 20px;
+                    padding: 60px 40px;
+                    text-align: center;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                    max-width: 500px;
+                    width: 100%;
+                }
+                .success-icon {
+                    width: 100px;
+                    height: 100px;
+                    background: #4CAF50;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 30px;
+                    animation: scaleIn 0.5s ease-out;
+                }
+                .success-icon::after {
+                    content: '✓';
+                    color: white;
+                    font-size: 60px;
+                    font-weight: bold;
+                }
+                @keyframes scaleIn {
+                    0% {
+                        transform: scale(0);
+                    }
+                    50% {
+                        transform: scale(1.1);
+                    }
+                    100% {
+                        transform: scale(1);
+                    }
+                }
+                h1 {
+                    color: #333;
+                    font-size: 32px;
+                    margin-bottom: 15px;
+                }
+                .message {
+                    color: #666;
+                    font-size: 18px;
+                    margin-bottom: 30px;
+                    line-height: 1.6;
+                }
+                .info-box {
+                    background: #f5f5f5;
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin: 30px 0;
+                    text-align: left;
+                }
+                .info-item {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 10px 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+                .info-item:last-child {
+                    border-bottom: none;
+                }
+                .info-label {
+                    color: #888;
+                    font-size: 14px;
+                }
+                .info-value {
+                    color: #333;
+                    font-weight: 600;
+                    font-size: 14px;
+                }
+                .button {
+                    display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 15px 40px;
+                    border-radius: 25px;
+                    text-decoration: none;
+                    font-size: 16px;
+                    font-weight: 600;
+                    transition: transform 0.2s, box-shadow 0.2s;
+                    margin-top: 20px;
+                }
+                .button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+                }
+                .footer {
+                    margin-top: 30px;
+                    color: #999;
+                    font-size: 14px;
+                }
+                .contact {
+                    margin-top: 20px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e0e0e0;
+                    color: #666;
+                    font-size: 14px;
+                }
+                .contact a {
+                    color: #667eea;
+                    text-decoration: none;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="success-icon"></div>
+                <h1>付款成功！</h1>
+                <p class="message">
+                    感謝您的付款！<br>
+                    我們已收到您的款項，訂單處理中
+                </p>
+                
+                <div class="info-box">
+                    <div class="info-item">
+                        <span class="info-label">付款狀態</span>
+                        <span class="info-value" style="color: #4CAF50;">✓ 已完成</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">處理狀態</span>
+                        <span class="info-value">系統自動對帳中</span>
+                    </div>
+                </div>
+
+                <div class="message">
+                    <strong>📅 取件資訊</strong><br>
+                    請於租借日期當天前往店面取件<br>
+                    <br>
+                    <strong>📍 取件地點</strong><br>
+                    桃園市中壢區義民路一段129號<br>
+                    <br>
+                    <strong>📞 聯絡電話</strong><br>
+                    0905-527-577
+                </div>
+
+                <a href="https://www.lensking.com.tw" class="button">返回首頁</a>
+
+                <div class="contact">
+                    如有任何問題，歡迎聯絡我們<br>
+                    LINE: <a href="https://line.me/ti/p/@lensking">@lensking</a><br>
+                    Email: <a href="mailto:paul945@gmail.com">paul945@gmail.com</a>
+                </div>
+
+                <div class="footer">
+                    © 2026 時光幻鏡攝影器材租借<br>
+                    感謝您的支持
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return html
