@@ -106,6 +106,14 @@ class SaleOrder(models.Model):
         help='超商繳費代碼的期限'
     )
 
+    # ==================== 付款連結欄位 ====================
+    
+    payment_link = fields.Char(
+        string='付款連結',
+        readonly=True,
+        help='產生的付款連結，客戶可以點擊此連結進行付款'
+    )
+
     # ==================== LINE 整合欄位 ====================
     
     line_user_id = fields.Char(
@@ -256,29 +264,39 @@ class SaleOrder(models.Model):
     
     def action_send_payment_link(self):
         """
-        發送付款連結
+        產生付款連結並儲存
         
-        可以透過：
-        1. Email
-        2. LINE Bot
-        3. SMS
+        功能：
+        1. 產生綠界付款頁面 URL
+        2. 儲存在 payment_link 欄位
+        3. 可以透過 LINE Bot 發送給客戶
+        4. 或顯示在 Odoo 訂單頁面供複製
+        
+        Returns:
+            dict: 包含付款連結的字典
         """
         self.ensure_one()
         
-        # 產生付款連結
-        payment_info = self.action_generate_ecpay_payment_link()
+        # 產生付款頁面 URL（指向 Odoo 自己的付款頁面）
+        base_url = 'https://www.lensking.com.tw'
+        payment_url = f'{base_url}/ecpay/payment/page/{self.id}'
         
-        # 這裡可以整合 LINE Bot API
-        # 發送付款連結給客戶
+        # 更新訂單狀態和付款連結
+        self.write({
+            'payment_state': 'pending',
+            'payment_link': payment_url,
+        })
+        
+        _logger.info(f'已產生付款連結：{payment_url}')
         
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': '付款連結已產生',
-                'message': f'付款連結：{payment_info["payment_url"]}',
+                'message': f'付款連結已儲存在「付款連結」欄位中，可隨時複製使用',
                 'type': 'success',
-                'sticky': False,
+                'sticky': True,  # 不自動消失
             }
         }
     

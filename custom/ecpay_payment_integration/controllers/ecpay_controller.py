@@ -439,3 +439,173 @@ class ECPayPaymentController(http.Controller):
         except Exception as e:
             _logger.error(f'處理超商付款通知時發生錯誤：{str(e)}', exc_info=True)
             return '0|System Error'
+
+
+class ECPayPaymentPageController(http.Controller):
+    """
+    綠界付款頁面 Controller
+    
+    功能：顯示付款頁面，用 POST 表單提交到綠界
+    """
+
+    @http.route('/ecpay/payment/page/<int:order_id>', type='http', auth='public', methods=['GET'], csrf=False)
+    def ecpay_payment_page(self, order_id, **kwargs):
+        """
+        顯示付款頁面
+        
+        這個頁面會：
+        1. 準備綠界付款參數
+        2. 產生自動提交的 POST 表單
+        3. 自動跳轉到綠界付款頁面
+        """
+        try:
+            # 查詢訂單
+            sale_order = request.env['sale.order'].sudo().browse(order_id)
+            
+            if not sale_order.exists():
+                return '<h1>訂單不存在</h1>'
+            
+            # 取得系統參數
+            IrConfigParameter = request.env['ir.config_parameter'].sudo()
+            merchant_id = IrConfigParameter.get_param('ecpay.merchant_id')
+            hash_key = IrConfigParameter.get_param('ecpay.hash_key')
+            hash_iv = IrConfigParameter.get_param('ecpay.hash_iv')
+            test_mode = IrConfigParameter.get_param('ecpay.test_mode', 'True') == 'True'
+            
+            if not all([merchant_id, hash_key, hash_iv]):
+                return '<h1>綠界設定不完整，請聯絡客服</h1>'
+            
+            # 設定綠界 API URL
+            if test_mode:
+                api_url = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'
+            else:
+                api_url = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
+            
+            # 準備付款資料
+            from datetime import datetime
+            
+            base_url = 'https://www.lensking.com.tw'
+            
+            payment_data = {
+                'MerchantID': merchant_id,
+                'MerchantTradeNo': sale_order.name,
+                'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
+                'PaymentType': 'aio',
+                'TotalAmount': str(int(sale_order.amount_total)),
+                'TradeDesc': f'時光幻鏡租借-{sale_order.name}',
+                'ItemName': sale_order.name,
+                'ReturnURL': f'{base_url}/ecpay/payment/notify',
+                'OrderResultURL': f'{base_url}/payment/success',
+                'ClientBackURL': base_url,
+                'ChoosePayment': 'ALL',
+                'PaymentInfoURL': f'{base_url}/ecpay/atm/notify',
+                'NeedExtraPaidInfo': 'Y',
+                'EncryptType': '1',
+            }
+            
+            # 產生檢查碼
+            check_mac = self._generate_check_mac(payment_data, hash_key, hash_iv)
+            payment_data['CheckMacValue'] = check_mac
+            
+            # 產生 HTML 表單
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>跳轉付款頁面</title>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    }}
+                    .container {{
+                        text-align: center;
+                        background: white;
+                        padding: 40px;
+                        border-radius: 10px;
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                    }}
+                    h1 {{
+                        color: #333;
+                        margin-bottom: 20px;
+                    }}
+                    .info {{
+                        color: #666;
+                        margin: 20px 0;
+                    }}
+                    .spinner {{
+                        border: 4px solid #f3f3f3;
+                        border-top: 4px solid #667eea;
+                        border-radius: 50%;
+                        width: 40px;
+                        height: 40px;
+                        animation: spin 1s linear infinite;
+                        margin: 20px auto;
+                    }}
+                    @keyframes spin {{
+                        0% {{ transform: rotate(0deg); }}
+                        100% {{ transform: rotate(360deg); }}
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🔒 安全付款</h1>
+                    <div class="spinner"></div>
+                    <p class="info">正在跳轉至綠界付款頁面...</p>
+                    <p class="info">訂單編號：{sale_order.name}</p>
+                    <p class="info">金額：NT$ {int(sale_order.amount_total):,}</p>
+                </div>
+                
+                <form id="ecpayForm" method="post" action="{api_url}">
+            """
+            
+            # 加入所有參數
+            for key, value in payment_data.items():
+                html += f'    <input type="hidden" name="{key}" value="{value}">\n'
+            
+            html += """
+                </form>
+                
+                <script>
+                    // 自動提交表單
+                    document.getElementById('ecpayForm').submit();
+                </script>
+            </body>
+            </html>
+            """
+            
+            return html
+            
+        except Exception as e:
+            _logger.error(f'顯示付款頁面時發生錯誤：{str(e)}', exc_info=True)
+            return f'<h1>系統錯誤</h1><p>{str(e)}</p>'
+    
+    def _generate_check_mac(self, params, hash_key, hash_iv):
+        """產生綠界檢查碼"""
+        import hashlib
+        from urllib.parse import quote_plus
+        
+        # 移除 CheckMacValue
+        params_copy = {k: v for k, v in params.items() if k != 'CheckMacValue'}
+        
+        # 按照 A-Z 排序
+        sorted_params = sorted(params_copy.items())
+        
+        # 組合字串
+        param_str = '&'.join([f'{k}={v}' for k, v in sorted_params])
+        
+        # 加上 HashKey 和 HashIV
+        raw_str = f'HashKey={hash_key}&{param_str}&HashIV={hash_iv}'
+        
+        # URL encode 並轉小寫
+        encoded_str = quote_plus(raw_str).lower()
+        
+        # SHA256 加密並轉大寫
+        return hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()

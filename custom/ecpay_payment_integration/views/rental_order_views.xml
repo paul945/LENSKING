@@ -52,6 +52,13 @@
                             <field name="payment_note" colspan="2"/>
                         </group>
                         
+                        <group string="付款連結" attrs="{'invisible': [('payment_link', '=', False)]}">
+                            <field name="payment_link" widget="url" readonly="1"/>
+                            <div class="alert alert-info" role="alert">
+                                ℹ️ 點選上方連結可複製，或直接點擊開啟付款頁面
+                            </div>
+                        </group>
+                        
                         <div class="oe_button_box" name="button_box">
                             <button name="action_send_payment_link" 
                                     type="object" 
