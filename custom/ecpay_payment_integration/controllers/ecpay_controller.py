@@ -208,8 +208,11 @@ class ECPayPaymentController(http.Controller):
             
             _logger.info(f'訂單 {merchant_trade_no} 已更新為已付款狀態')
             
-            # 6. 建立付款記錄
-            self._create_payment_record(rental_order, post)
+            # 6. 嘗試建立付款記錄（如果失敗也繼續）
+            try:
+                self._create_payment_record(rental_order, post)
+            except Exception as e:
+                _logger.warning(f'建立付款記錄失敗（不影響訂單狀態）：{str(e)}')
             
             # 7. 記錄付款日誌
             rental_order.message_post(
@@ -497,7 +500,7 @@ class ECPayPaymentPageController(http.Controller):
                 'ReturnURL': f'{base_url}/ecpay/payment/notify',
                 'OrderResultURL': f'{base_url}/payment/success',
                 'ClientBackURL': base_url,
-                'ChoosePayment': 'ALL',
+                'ChoosePayment': 'Credit#WebATM#ATM#ApplePay',  # 信用卡、WebATM、ATM、ApplePay
                 'PaymentInfoURL': f'{base_url}/ecpay/atm/notify',
                 'NeedExtraPaidInfo': 'Y',
                 'EncryptType': '1',
@@ -785,8 +788,8 @@ class ECPaySuccessPageController(http.Controller):
 
                 <div class="contact">
                     如有任何問題，歡迎聯絡我們<br>
-                    LINE: <a href="https://line.me/ti/p/@lensking">@lensking</a><br>
-                    Email: <a href="mailto:paul945@gmail.com">paul945@gmail.com</a>
+                    LINE: <a href="https://line.me/ti/p/@lens-king">@lens-king</a><br>
+                    Email: <a href="mailto:lensfantasy@gmail.com">lensfantasy@gmail.com</a>
                 </div>
 
                 <div class="footer">
