@@ -78,6 +78,37 @@ class ECPayPaymentController(http.Controller):
             _logger.warning(f'時間轉換失敗：{ecpay_datetime_str}，錯誤：{str(e)}')
             return datetime.now()
 
+    def _convert_payment_method(self, ecpay_payment_type):
+        """
+        轉換綠界付款方式為 Odoo 選項
+        
+        綠界付款方式 → Odoo payment_method
+        
+        Args:
+            ecpay_payment_type: 綠界的 PaymentType
+            
+        Returns:
+            str: Odoo 的 payment_method 值
+        """
+        # 綠界付款方式對照表
+        payment_mapping = {
+            'Credit_CreditCard': 'credit_card',         # 信用卡
+            'Credit': 'credit_card',                    # 信用卡一次付清
+            'Credit_Installment': 'credit_installment', # 信用卡分期
+            'WebATM': 'web_atm',                        # 網路 ATM
+            'ATM': 'atm',                               # ATM 轉帳
+            'CVS': 'cvs',                               # 超商代碼
+            'BARCODE': 'barcode',                       # 超商條碼
+            'ApplePay': 'apple_pay',                    # Apple Pay
+            'GooglePay': 'google_pay',                  # Google Pay
+            'LINE_Pay': 'line_pay',                     # LINE Pay
+        }
+        
+        # 查找對應值，如果找不到就回傳 credit_card 作為預設
+        result = payment_mapping.get(ecpay_payment_type, 'credit_card')
+        _logger.info(f'付款方式轉換：{ecpay_payment_type} → {result}')
+        return result
+
     def _verify_ecpay_data(self, post_data):
         """
         驗證綠界回傳資料的檢查碼
@@ -218,13 +249,15 @@ class ECPayPaymentController(http.Controller):
             # 5. 更新訂單狀態為「已付款」
             # 轉換綠界時間格式
             payment_datetime = self._convert_ecpay_datetime(payment_date)
+            # 轉換付款方式
+            payment_method_value = self._convert_payment_method(payment_type)
             
             rental_order.write({
                 'payment_state': 'paid',
                 'state': 'sale',  # 確認訂單
                 'payment_transaction_id': trade_no,
                 'payment_date': payment_datetime,
-                'payment_method': payment_type,
+                'payment_method': payment_method_value,
                 'payment_auto_registered': True,
                 'payment_note': f'綠界自動對帳完成 - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
             })
