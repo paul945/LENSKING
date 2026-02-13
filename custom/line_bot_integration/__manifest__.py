@@ -34,6 +34,7 @@ LINE Bot 整合模組
         'base',
         'sale',
         'sale_management',
+        'mail',  # 用於 Chatter 功能
         'ecpay_payment_integration',  # 依賴 Phase 1 的綠界模組
     ],
     'data': [

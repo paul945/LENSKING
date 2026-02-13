@@ -14,6 +14,7 @@ class LineUser(models.Model):
     """
     _name = 'line.user'
     _description = 'LINE 用戶'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _rec_name = 'display_name'
     _order = 'last_interaction desc'
     

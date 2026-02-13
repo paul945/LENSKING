@@ -28,10 +28,6 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button name="%(action_line_conversation)d" type="action" 
-                                class="oe_stat_button" icon="fa-comments">
-                            <field name="conversation_count" widget="statinfo" string="對話"/>
-                        </button>
                         <button name="%(sale.action_orders)d" type="action" 
                                 class="oe_stat_button" icon="fa-shopping-cart"
                                 context="{'search_default_line_user_id': active_id}">
