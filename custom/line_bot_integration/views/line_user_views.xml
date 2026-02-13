@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- LINE 用戶 Tree View -->
+    <record id="view_line_user_tree" model="ir.ui.view">
+        <field name="name">line.user.tree</field>
+        <field name="model">line.user</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="display_name"/>
+                <field name="line_user_id"/>
+                <field name="partner_id"/>
+                <field name="conversation_state"/>
+                <field name="last_interaction"/>
+                <field name="order_count"/>
+                <field name="conversation_count"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- LINE 用戶 Form View -->
+    <record id="view_line_user_form" model="ir.ui.view">
+        <field name="name">line.user.form</field>
+        <field name="model">line.user</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="reset_state" type="object" string="重置狀態" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_line_conversation)d" type="action" 
+                                class="oe_stat_button" icon="fa-comments">
+                            <field name="conversation_count" widget="statinfo" string="對話"/>
+                        </button>
+                        <button name="%(sale.action_orders)d" type="action" 
+                                class="oe_stat_button" icon="fa-shopping-cart"
+                                context="{'search_default_line_user_id': active_id}">
+                            <field name="order_count" widget="statinfo" string="訂單"/>
+                        </button>
+                    </div>
+                    
+                    <field name="picture_url" widget="image" class="oe_avatar"/>
+                    
+                    <div class="oe_title">
+                        <h1>
+                            <field name="display_name" placeholder="顯示名稱"/>
+                        </h1>
+                    </div>
+                    
+                    <group>
+                        <group>
+                            <field name="line_user_id"/>
+                            <field name="partner_id"/>
+                            <field name="conversation_state"/>
+                        </group>
+                        <group>
+                            <field name="status_message"/>
+                            <field name="last_interaction"/>
+                        </group>
+                    </group>
+                    
+                    <notebook>
+                        <page string="暫存資料">
+                            <field name="temp_data" widget="ace" options="{'mode': 'json'}"/>
+                        </page>
+                        <page string="對話記錄">
+                            <field name="conversation_ids">
+                                <tree>
+                                    <field name="create_date"/>
+                                    <field name="direction"/>
+                                    <field name="message_type"/>
+                                    <field name="content"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="訂單記錄">
+                            <field name="order_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="create_date"/>
+                                    <field name="payment_state"/>
+                                    <field name="amount_total"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- LINE 用戶 Search View -->
+    <record id="view_line_user_search" model="ir.ui.view">
+        <field name="name">line.user.search</field>
+        <field name="model">line.user</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="display_name"/>
+                <field name="line_user_id"/>
+                <field name="partner_id"/>
+                <separator/>
+                <filter string="閒置中" name="idle" domain="[('conversation_state', '=', 'idle')]"/>
+                <filter string="對話中" name="active" domain="[('conversation_state', '!=', 'idle')]"/>
+                <separator/>
+                <filter string="有關聯客戶" name="has_partner" domain="[('partner_id', '!=', False)]"/>
+                <filter string="無關聯客戶" name="no_partner" domain="[('partner_id', '=', False)]"/>
+                <separator/>
+                <group expand="0" string="分組">
+                    <filter string="對話狀態" name="group_state" context="{'group_by': 'conversation_state'}"/>
+                    <filter string="客戶" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- LINE 用戶 Action -->
+    <record id="action_line_user" model="ir.actions.act_window">
+        <field name="name">LINE 用戶</field>
+        <field name="res_model">line.user</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                建立第一個 LINE 用戶
+            </p>
+            <p>
+                LINE 用戶會在客戶透過 LINE Bot 對話時自動建立。
+            </p>
+        </field>
+    </record>
+</odoo>

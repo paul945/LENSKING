@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- LINE Bot 主選單 -->
+    <menuitem id="menu_line_bot_root"
+              name="LINE Bot"
+              sequence="100"
+              web_icon="line_bot_integration,static/description/icon.png"/>
+    
+    <!-- LINE 用戶選單 -->
+    <menuitem id="menu_line_user"
+              name="LINE 用戶"
+              parent="menu_line_bot_root"
+              action="action_line_user"
+              sequence="10"/>
+    
+    <!-- 對話記錄選單 -->
+    <menuitem id="menu_line_conversation"
+              name="對話記錄"
+              parent="menu_line_bot_root"
+              action="action_line_conversation"
+              sequence="20"/>
+    
+    <!-- 設定選單 -->
+    <menuitem id="menu_line_settings"
+              name="設定"
+              parent="menu_line_bot_root"
+              sequence="100"/>
+    
+    <!-- 系統參數選單 -->
+    <menuitem id="menu_line_system_parameters"
+              name="LINE API 設定"
+              parent="menu_line_settings"
+              action="base.ir_config_list_action"
+              groups="base.group_system"
+              sequence="10"/>
+</odoo>

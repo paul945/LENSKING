@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        
+        <!-- LINE Messaging API 設定 -->
+        
+        <record id="line_channel_id" model="ir.config_parameter">
+            <field name="key">line.channel_id</field>
+            <field name="value">2007096219</field>
+        </record>
+        
+        <record id="line_channel_secret" model="ir.config_parameter">
+            <field name="key">line.channel_secret</field>
+            <field name="value">4de21ccbe3a1c3ff5ba74bd04d1806b3</field>
+        </record>
+        
+        <record id="line_channel_access_token" model="ir.config_parameter">
+            <field name="key">line.channel_access_token</field>
+            <field name="value">EcRGamk0LvTX+GWsju3M7MfbjaPuFnaIcu90or0B8fbiu6aUpPo47aByK75bOit9S+mJPXP0qsHxYeQ3mqTlZSysHQ48DY4qOJsOPasjqyfTbT7Znys631vjTt92TqzRtT8AXD3Wvm5h+qkXQ/khuwdB04t89/1O/w1cDnyilFU=</field>
+        </record>
+        
+        <!-- Webhook URL (供參考) -->
+        <record id="line_webhook_url" model="ir.config_parameter">
+            <field name="key">line.webhook_url</field>
+            <field name="value">https://www.lensking.com.tw/line/webhook</field>
+        </record>
+        
+    </data>
+</odoo>
