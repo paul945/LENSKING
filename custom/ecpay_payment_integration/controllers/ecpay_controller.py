@@ -58,6 +58,26 @@ class ECPayPaymentController(http.Controller):
         # 轉大寫
         return check_mac.upper()
 
+    def _convert_ecpay_datetime(self, ecpay_datetime_str):
+        """
+        轉換綠界時間格式為 Odoo 格式
+        
+        綠界格式：2026/02/13 13:15:30
+        Odoo 格式：2026-02-13 13:15:30
+        
+        Args:
+            ecpay_datetime_str: 綠界的時間字串
+            
+        Returns:
+            datetime: Python datetime 物件
+        """
+        try:
+            # 綠界格式：yyyy/MM/dd HH:mm:ss
+            return datetime.strptime(ecpay_datetime_str, '%Y/%m/%d %H:%M:%S')
+        except Exception as e:
+            _logger.warning(f'時間轉換失敗：{ecpay_datetime_str}，錯誤：{str(e)}')
+            return datetime.now()
+
     def _verify_ecpay_data(self, post_data):
         """
         驗證綠界回傳資料的檢查碼
@@ -196,11 +216,14 @@ class ECPayPaymentController(http.Controller):
                 return '1|OK'  # 仍然回傳成功，避免綠界重送
             
             # 5. 更新訂單狀態為「已付款」
+            # 轉換綠界時間格式
+            payment_datetime = self._convert_ecpay_datetime(payment_date)
+            
             rental_order.write({
                 'payment_state': 'paid',
                 'state': 'sale',  # 確認訂單
                 'payment_transaction_id': trade_no,
-                'payment_date': payment_date,
+                'payment_date': payment_datetime,
                 'payment_method': payment_type,
                 'payment_auto_registered': True,
                 'payment_note': f'綠界自動對帳完成 - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
