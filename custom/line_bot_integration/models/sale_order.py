@@ -19,12 +19,18 @@ class SaleOrder(models.Model):
         help='建立此訂單的 LINE 用戶'
     )
     
+    # 訂單來源欄位
+    # 如果基礎模組沒有此欄位，我們建立一個新的
+    # 如果已存在，則擴充選項
     order_source = fields.Selection(
-        selection_add=[
+        selection=[
+            ('manual', '人工輸入'),
+            ('website', '官網'),
             ('line', 'LINE Bot'),
         ],
-        ondelete={'line': 'set default'},
-        help='訂單來源'
+        string='訂單來源',
+        default='manual',
+        help='此訂單的建立來源'
     )
     
     # ==================== 輔助方法 ====================
