@@ -6,8 +6,8 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <!-- 在其他資訊頁籤中加入 LINE 資訊 -->
-            <xpath expr="//notebook/page[@name='other_information']" position="inside">
+            <!-- 在訂單資訊後面加入 LINE 資訊 -->
+            <xpath expr="//group[@name='sale_info']" position="after">
                 <group string="LINE Bot 資訊" attrs="{'invisible': [('order_source', '!=', 'line')]}">
                     <field name="order_source"/>
                     <field name="line_user_id"/>
@@ -34,11 +34,13 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_sales_order_filter"/>
         <field name="arch" type="xml">
-            <xpath expr="//filter[@name='my_quotation']" position="after">
+            <!-- 在篩選區最後加入 LINE Bot 篩選 -->
+            <xpath expr="//search/filter[last()]" position="after">
                 <separator/>
                 <filter string="LINE Bot 訂單" name="line_orders" domain="[('order_source', '=', 'line')]"/>
             </xpath>
-            <xpath expr="//group[@name='group_by']" position="inside">
+            <!-- 在分組區加入訂單來源分組 -->
+            <xpath expr="//search/group" position="inside">
                 <filter string="訂單來源" name="group_by_source" context="{'group_by': 'order_source'}"/>
             </xpath>
         </field>
