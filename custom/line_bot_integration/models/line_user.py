@@ -56,7 +56,7 @@ class LineUser(models.Model):
         ('idle', '閒置'),
         ('browsing_categories', '瀏覽分類'),
         ('browsing_equipment', '瀏覽器材'),
-        ('selecting_dates', '選擇日期'),
+        ('viewing_cart', '查看購物車'),
         ('confirming_order', '確認訂單'),
         ('waiting_payment', '等待付款'),
     ], string='對話狀態', default='idle', index=True,

@@ -38,6 +38,14 @@ class ConversationHandler(models.AbstractModel):
             message_text
         )
         
+        # 特殊指令處理（任何狀態都可用）
+        if message_text.lower().strip() in ['購物車', '查看購物車', 'cart']:
+            self._show_cart(line_user, reply_token)
+            return
+        elif message_text.lower().strip() in ['清空購物車', 'clear cart']:
+            self._clear_cart(line_user, reply_token)
+            return
+        
         # 根據當前狀態處理訊息
         if line_user.conversation_state == 'idle':
             self._handle_idle_state(line_user, message_text, reply_token)
@@ -45,6 +53,10 @@ class ConversationHandler(models.AbstractModel):
             self._handle_browsing_categories(line_user, message_text, reply_token)
         elif line_user.conversation_state == 'browsing_equipment':
             self._handle_browsing_equipment(line_user, message_text, reply_token)
+        elif line_user.conversation_state == 'viewing_cart':
+            self._handle_viewing_cart(line_user, message_text, reply_token)
+        elif line_user.conversation_state == 'confirming_order':
+            self._handle_confirming_order(line_user, message_text, reply_token)
         else:
             # 未知狀態，重置
             line_user.reset_state()
@@ -77,14 +89,21 @@ class ConversationHandler(models.AbstractModel):
     
     def _handle_browsing_equipment(self, line_user, message_text, reply_token):
         """處理瀏覽器材狀態"""
-        # 檢查是否選擇了器材
-        if message_text.startswith('租借:'):
+        # 檢查是否選擇了器材（加入購物車）
+        if message_text.startswith('加入購物車:'):
             equipment_id = message_text.split(':')[1]
-            self._select_equipment(line_user, equipment_id, reply_token)
-        else:
-            # 返回分類選單
+            self._add_to_cart(line_user, equipment_id, reply_token)
+        elif message_text == '查看購物車':
+            self._show_cart(line_user, reply_token)
+        elif message_text == '返回分類':
             line_user.conversation_state = 'browsing_categories'
             self._send_category_menu(line_user, reply_token)
+        else:
+            # 可能是重新選擇分類
+            if message_text in ['相機機身', '鏡頭', '閃光燈', '配件']:
+                self._show_equipment_list(line_user, message_text, reply_token)
+            else:
+                self._send_category_menu(line_user, reply_token)
     
     # ==================== 功能方法 ====================
     
@@ -415,8 +434,8 @@ class ConversationHandler(models.AbstractModel):
                             'type': 'button',
                             'action': {
                                 'type': 'message',
-                                'label': '選擇租借',
-                                'text': f"租借:{eq['id']}"
+                                'label': '🛒 加入購物車',
+                                'text': f"加入購物車:{eq['id']}"
                             },
                             'style': 'primary',
                             'color': '#667eea'
@@ -431,11 +450,44 @@ class ConversationHandler(models.AbstractModel):
             'contents': bubbles
         }
         
-        messages = [{
-            'type': 'flex',
-            'altText': f'{category}器材列表',
-            'contents': flex_contents
-        }]
+        # 取得目前購物車數量
+        cart_items = temp_data.get('cart', [])
+        cart_count = len(cart_items)
+        
+        # 建立快速回覆按鈕
+        quick_reply_items = [
+            {
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '🛒 查看購物車' + (f' ({cart_count})' if cart_count > 0 else ''),
+                    'text': '查看購物車'
+                }
+            },
+            {
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '◀️ 返回分類',
+                    'text': '返回分類'
+                }
+            }
+        ]
+        
+        messages = [
+            {
+                'type': 'flex',
+                'altText': f'{category}器材列表',
+                'contents': flex_contents
+            },
+            {
+                'type': 'text',
+                'text': f'📦 {category}',
+                'quickReply': {
+                    'items': quick_reply_items
+                }
+            }
+        ]
         
         line_client.reply_message(reply_token, messages)
         
@@ -446,70 +498,417 @@ class ConversationHandler(models.AbstractModel):
             f'{category}器材列表'
         )
     
-    def _select_equipment(self, line_user, equipment_id, reply_token):
-        """選擇器材（簡化版本 - 直接建立訂單）"""
+    def _add_to_cart(self, line_user, equipment_id, reply_token):
+        """加入購物車"""
         line_client = self.env['line.client.service']
         
-        # 建立簡化的訂單（Phase 2.1 版本）
-        # 未來版本會加入日期選擇
+        # 範例器材資料
+        equipment_data = {
+            'camera_001': {'name': 'Canon R6 Mark II', 'price': 1200},
+            'camera_002': {'name': 'Sony A7IV', 'price': 1000},
+            'lens_001': {'name': 'Canon RF 24-70mm F2.8', 'price': 300},
+            'lens_002': {'name': 'Sony 24-70mm GM II', 'price': 350},
+            'flash_001': {'name': 'Godox V1', 'price': 150},
+            'flash_002': {'name': 'Profoto A1X', 'price': 200},
+        }
+        
+        equipment = equipment_data.get(equipment_id)
+        if not equipment:
+            text = '抱歉，找不到此器材。'
+            messages = [{'type': 'text', 'text': text}]
+            line_client.reply_message(reply_token, messages)
+            return
+        
+        # 取得購物車
+        temp_data = line_user.get_temp_data()
+        cart = temp_data.get('cart', [])
+        
+        # 檢查是否已在購物車中
+        existing_item = next((item for item in cart if item['id'] == equipment_id), None)
+        
+        if existing_item:
+            # 已存在，增加數量
+            existing_item['quantity'] += 1
+            action_text = '已增加數量'
+        else:
+            # 新增到購物車
+            cart.append({
+                'id': equipment_id,
+                'name': equipment['name'],
+                'price': equipment['price'],
+                'quantity': 1
+            })
+            action_text = '已加入購物車'
+        
+        temp_data['cart'] = cart
+        line_user.set_temp_data(temp_data)
+        
+        # 計算總價
+        total = sum(item['price'] * item['quantity'] for item in cart)
+        
+        # 發送確認訊息
+        quick_reply_items = [
+            {
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '🛒 查看購物車',
+                    'text': '查看購物車'
+                }
+            },
+            {
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '➕ 繼續選購',
+                    'text': '租借器材'
+                }
+            }
+        ]
+        
+        text = f"""✅ {action_text}！
+
+📦 {equipment['name']}
+💰 NT$ {equipment['price']}/天
+
+🛒 購物車：{len(cart)} 項商品
+💵 小計：NT$ {total}"""
+        
+        messages = [{
+            'type': 'text',
+            'text': text,
+            'quickReply': {
+                'items': quick_reply_items
+            }
+        }]
+        
+        line_client.reply_message(reply_token, messages)
+        
+        # 記錄發送的訊息
+        self.env['line.conversation'].log_outgoing_message(
+            line_user,
+            'text',
+            text
+        )
+    
+    def _show_cart(self, line_user, reply_token):
+        """顯示購物車"""
+        line_client = self.env['line.client.service']
+        temp_data = line_user.get_temp_data()
+        cart = temp_data.get('cart', [])
+        
+        if not cart:
+            text = '🛒 購物車是空的\n\n請先選擇要租借的器材！'
+            quick_reply_items = [{
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '📷 租借器材',
+                    'text': '租借器材'
+                }
+            }]
+            messages = [{
+                'type': 'text',
+                'text': text,
+                'quickReply': {'items': quick_reply_items}
+            }]
+            line_client.reply_message(reply_token, messages)
+            return
+        
+        # 建立購物車 Flex Message
+        total = sum(item['price'] * item['quantity'] for item in cart)
+        
+        # 購物車項目
+        cart_items_contents = []
+        for idx, item in enumerate(cart):
+            item_content = {
+                'type': 'box',
+                'layout': 'horizontal',
+                'contents': [
+                    {
+                        'type': 'text',
+                        'text': f"{item['quantity']}x",
+                        'size': 'sm',
+                        'color': '#999999',
+                        'flex': 1
+                    },
+                    {
+                        'type': 'text',
+                        'text': item['name'],
+                        'size': 'sm',
+                        'wrap': True,
+                        'flex': 4
+                    },
+                    {
+                        'type': 'text',
+                        'text': f"NT$ {item['price'] * item['quantity']}",
+                        'size': 'sm',
+                        'align': 'end',
+                        'flex': 2
+                    }
+                ],
+                'margin': 'md' if idx > 0 else 'none'
+            }
+            cart_items_contents.append(item_content)
+        
+        flex_contents = {
+            'type': 'bubble',
+            'header': {
+                'type': 'box',
+                'layout': 'vertical',
+                'contents': [
+                    {
+                        'type': 'text',
+                        'text': '🛒 購物車',
+                        'weight': 'bold',
+                        'size': 'xl',
+                        'color': '#ffffff'
+                    }
+                ],
+                'backgroundColor': '#667eea',
+                'paddingAll': '20px'
+            },
+            'body': {
+                'type': 'box',
+                'layout': 'vertical',
+                'contents': [
+                    {
+                        'type': 'text',
+                        'text': '租借清單',
+                        'size': 'md',
+                        'weight': 'bold',
+                        'margin': 'none'
+                    },
+                    {
+                        'type': 'separator',
+                        'margin': 'md'
+                    },
+                    {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': cart_items_contents,
+                        'margin': 'lg'
+                    },
+                    {
+                        'type': 'separator',
+                        'margin': 'lg'
+                    },
+                    {
+                        'type': 'box',
+                        'layout': 'horizontal',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '小計',
+                                'size': 'lg',
+                                'weight': 'bold'
+                            },
+                            {
+                                'type': 'text',
+                                'text': f'NT$ {total}',
+                                'size': 'lg',
+                                'weight': 'bold',
+                                'color': '#FF6B6B',
+                                'align': 'end'
+                            }
+                        ],
+                        'margin': 'lg'
+                    }
+                ]
+            },
+            'footer': {
+                'type': 'box',
+                'layout': 'vertical',
+                'contents': [
+                    {
+                        'type': 'button',
+                        'action': {
+                            'type': 'message',
+                            'label': '✅ 確認訂單',
+                            'text': '確認訂單'
+                        },
+                        'style': 'primary',
+                        'color': '#4CAF50'
+                    },
+                    {
+                        'type': 'button',
+                        'action': {
+                            'type': 'message',
+                            'label': '➕ 繼續選購',
+                            'text': '租借器材'
+                        },
+                        'style': 'secondary',
+                        'margin': 'sm'
+                    },
+                    {
+                        'type': 'button',
+                        'action': {
+                            'type': 'message',
+                            'label': '🗑️ 清空購物車',
+                            'text': '清空購物車'
+                        },
+                        'style': 'secondary',
+                        'margin': 'sm'
+                    }
+                ]
+            }
+        }
+        
+        line_user.conversation_state = 'viewing_cart'
+        
+        messages = [{
+            'type': 'flex',
+            'altText': '購物車',
+            'contents': flex_contents
+        }]
+        
+        line_client.reply_message(reply_token, messages)
+        
+        # 記錄發送的訊息
+        self.env['line.conversation'].log_outgoing_message(
+            line_user,
+            'flex',
+            '購物車'
+        )
+    
+    def _clear_cart(self, line_user, reply_token):
+        """清空購物車"""
+        line_client = self.env['line.client.service']
+        
+        temp_data = line_user.get_temp_data()
+        temp_data['cart'] = []
+        line_user.set_temp_data(temp_data)
+        line_user.conversation_state = 'idle'
+        
+        text = '🗑️ 購物車已清空'
+        quick_reply_items = [{
+            'type': 'action',
+            'action': {
+                'type': 'message',
+                'label': '📷 重新選擇',
+                'text': '租借器材'
+            }
+        }]
+        
+        messages = [{
+            'type': 'text',
+            'text': text,
+            'quickReply': {'items': quick_reply_items}
+        }]
+        
+        line_client.reply_message(reply_token, messages)
+        
+        # 記錄發送的訊息
+        self.env['line.conversation'].log_outgoing_message(
+            line_user,
+            'text',
+            text
+        )
+    
+    def _handle_viewing_cart(self, line_user, message_text, reply_token):
+        """處理查看購物車狀態"""
+        if message_text == '確認訂單':
+            self._confirm_and_create_order(line_user, reply_token)
+        elif message_text == '繼續選購' or message_text == '租借器材':
+            line_user.conversation_state = 'browsing_categories'
+            self._send_category_menu(line_user, reply_token)
+        elif message_text == '清空購物車':
+            self._clear_cart(line_user, reply_token)
+        else:
+            # 預設重新顯示購物車
+            self._show_cart(line_user, reply_token)
+    
+    def _handle_confirming_order(self, line_user, message_text, reply_token):
+        """處理確認訂單狀態"""
+        if message_text == '確定建立':
+            self._create_order_from_cart(line_user, reply_token)
+        elif message_text == '返回購物車':
+            self._show_cart(line_user, reply_token)
+        else:
+            line_user.reset_state()
+            self._send_main_menu(line_user, reply_token)
+    
+    def _confirm_and_create_order(self, line_user, reply_token):
+        """確認並建立訂單"""
+        line_client = self.env['line.client.service']
+        
+        temp_data = line_user.get_temp_data()
+        cart = temp_data.get('cart', [])
+        
+        if not cart:
+            text = '購物車是空的，無法建立訂單。'
+            messages = [{'type': 'text', 'text': text}]
+            line_client.reply_message(reply_token, messages)
+            return
+        
+        # 直接建立訂單（簡化版本）
+        self._create_order_from_cart(line_user, reply_token)
+    
+    def _create_order_from_cart(self, line_user, reply_token):
+        """從購物車建立訂單"""
+        line_client = self.env['line.client.service']
         
         try:
             # 確保有 Partner
             if not line_user.partner_id:
                 line_user.create_partner()
             
-            # 從暫存資料取得分類和器材資訊
+            # 取得購物車
             temp_data = line_user.get_temp_data()
-            category = temp_data.get('category', '器材')
+            cart = temp_data.get('cart', [])
             
-            # 範例器材資料（與前面的對照）
-            equipment_data = {
-                'camera_001': {'name': 'Canon R6 Mark II', 'price': 1200},
-                'camera_002': {'name': 'Sony A7IV', 'price': 1000},
-                'lens_001': {'name': 'Canon RF 24-70mm F2.8', 'price': 300},
-                'lens_002': {'name': 'Sony 24-70mm GM II', 'price': 350},
-                'flash_001': {'name': 'Godox V1', 'price': 150},
-                'flash_002': {'name': 'Profoto A1X', 'price': 200},
-            }
+            if not cart:
+                text = '購物車是空的，無法建立訂單。'
+                messages = [{'type': 'text', 'text': text}]
+                line_client.reply_message(reply_token, messages)
+                return
             
-            equipment = equipment_data.get(equipment_id, {'name': '器材租借', 'price': 1000})
+            # 建立訂單明細
+            order_lines = []
+            total_amount = 0
             
-            # 查找或建立「LINE Bot 租借」產品
-            product = self.env['product.product'].sudo().search([
-                ('name', '=', equipment['name'])
-            ], limit=1)
-            
-            if not product:
-                # 建立通用產品
-                product_category = self.env['product.category'].sudo().search([
-                    ('name', '=', '租賃商品')
+            for item in cart:
+                # 查找或建立產品
+                product = self.env['product.product'].sudo().search([
+                    ('name', '=', item['name'])
                 ], limit=1)
                 
-                if not product_category:
-                    product_category = self.env['product.category'].sudo().create({
-                        'name': '租賃商品'
+                if not product:
+                    # 建立產品
+                    product_category = self.env['product.category'].sudo().search([
+                        ('name', '=', '租賃商品')
+                    ], limit=1)
+                    
+                    if not product_category:
+                        product_category = self.env['product.category'].sudo().create({
+                            'name': '租賃商品'
+                        })
+                    
+                    product = self.env['product.product'].sudo().create({
+                        'name': item['name'],
+                        'list_price': item['price'],
+                        'type': 'service',
+                        'categ_id': product_category.id,
+                        'sale_ok': True,
+                        'purchase_ok': False,
                     })
                 
-                product = self.env['product.product'].sudo().create({
-                    'name': equipment['name'],
-                    'list_price': equipment['price'],
-                    'type': 'service',
-                    'categ_id': product_category.id,
-                    'sale_ok': True,
-                    'purchase_ok': False,
-                })
+                # 加入訂單明細
+                order_lines.append((0, 0, {
+                    'product_id': product.id,
+                    'name': f"{item['name']} - 租借（{item['quantity']}天）",
+                    'product_uom_qty': item['quantity'],
+                    'price_unit': item['price'],
+                }))
+                
+                total_amount += item['price'] * item['quantity']
             
-            # 建立訂單（包含產品）
+            # 建立訂單
             order_vals = {
                 'partner_id': line_user.partner_id.id,
                 'line_user_id': line_user.id,
                 'order_source': 'line',
-                'order_line': [(0, 0, {
-                    'product_id': product.id,
-                    'name': f'{equipment["name"]} - 租借（1天）',
-                    'product_uom_qty': 1,
-                    'price_unit': equipment['price'],
-                })],
+                'order_line': order_lines,
             }
             
             order = self.env['sale.order'].sudo().create(order_vals)
@@ -517,14 +916,22 @@ class ConversationHandler(models.AbstractModel):
             # 產生付款連結
             order.action_send_payment_link()
             
-            # 重置狀態
+            # 清空購物車並重置狀態
+            temp_data['cart'] = []
+            line_user.set_temp_data(temp_data)
             line_user.reset_state()
+            
+            # 建立訂單摘要文字
+            items_text = '\n'.join([f"• {item['quantity']}x {item['name']} - NT$ {item['price'] * item['quantity']}" 
+                                   for item in cart])
             
             # 發送確認訊息
             text = f"""✅ 訂單已建立！
 
-📦 租借器材：{equipment['name']}
-💰 金額：NT$ {equipment['price']}
+📦 租借器材：
+{items_text}
+
+💰 總金額：NT$ {total_amount}
 
 訂單編號：{order.name}
 
@@ -551,7 +958,7 @@ class ConversationHandler(models.AbstractModel):
                 order.id
             )
             
-            _logger.info(f'已為 LINE 用戶 {line_user.line_user_id} 建立訂單 {order.name}，包含產品：{equipment["name"]}')
+            _logger.info(f'已為 LINE 用戶 {line_user.line_user_id} 建立訂單 {order.name}，包含 {len(cart)} 項商品，總金額：NT$ {total_amount}')
             
         except Exception as e:
             _logger.error(f'建立訂單失敗：{str(e)}', exc_info=True)
