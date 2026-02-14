@@ -917,11 +917,13 @@ class ConversationHandler(models.AbstractModel):
                 
                 total_amount += item['price'] * item['quantity']
             
-            # 建立訂單
+            # 建立訂單（包含租賃標記）
             order_vals = {
                 'partner_id': line_user.partner_id.id,
                 'line_user_id': line_user.id,
                 'order_source': 'line',
+                'is_rental_order': True,  # ⭐ 正確的欄位名稱
+                'rental_status': 'pickup',  # ⭐ 租賃狀態：待取件
                 'order_line': order_lines,
             }
             
