@@ -863,6 +863,16 @@ class ConversationHandler(models.AbstractModel):
                 line_client.reply_message(reply_token, messages)
                 return
             
+            # 取得租借日期（未來會實作 LIFF 日期選擇，目前使用預設值）
+            # 預設：今天取件，明天歸還
+            from datetime import datetime, timedelta
+            today = datetime.now()
+            tomorrow = today + timedelta(days=1)
+            
+            # 營業時間：12:00 - 21:30
+            pickup_datetime = today.replace(hour=14, minute=0, second=0, microsecond=0)
+            return_datetime = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)
+            
             # 建立訂單明細
             order_lines = []
             total_amount = 0
@@ -891,14 +901,18 @@ class ConversationHandler(models.AbstractModel):
                         'categ_id': product_category.id,
                         'sale_ok': True,
                         'purchase_ok': False,
+                        'rent_ok': True,  # ⭐ 標記為可租借
                     })
                 
-                # 加入訂單明細
+                # 加入訂單明細（包含租賃資訊）
                 order_lines.append((0, 0, {
                     'product_id': product.id,
                     'name': f"{item['name']} - 租借（{item['quantity']}天）",
                     'product_uom_qty': item['quantity'],
                     'price_unit': item['price'],
+                    'is_rental': True,  # ⭐ 標記為租賃訂單明細
+                    'start_date': pickup_datetime.strftime('%Y-%m-%d %H:%M:%S'),  # ⭐ 取件時間
+                    'return_date': return_datetime.strftime('%Y-%m-%d %H:%M:%S'),  # ⭐ 歸還時間
                 }))
                 
                 total_amount += item['price'] * item['quantity']
@@ -925,11 +939,19 @@ class ConversationHandler(models.AbstractModel):
             items_text = '\n'.join([f"• {item['quantity']}x {item['name']} - NT$ {item['price'] * item['quantity']}" 
                                    for item in cart])
             
+            # 格式化日期時間
+            pickup_str = pickup_datetime.strftime('%m/%d %H:%M')
+            return_str = return_datetime.strftime('%m/%d %H:%M')
+            
             # 發送確認訊息
             text = f"""✅ 訂單已建立！
 
 📦 租借器材：
 {items_text}
+
+📅 租借期間：
+取件：{pickup_str}
+歸還：{return_str}
 
 💰 總金額：NT$ {total_amount}
 
@@ -958,7 +980,7 @@ class ConversationHandler(models.AbstractModel):
                 order.id
             )
             
-            _logger.info(f'已為 LINE 用戶 {line_user.line_user_id} 建立訂單 {order.name}，包含 {len(cart)} 項商品，總金額：NT$ {total_amount}')
+            _logger.info(f'已為 LINE 用戶 {line_user.line_user_id} 建立租賃訂單 {order.name}，包含 {len(cart)} 項商品，總金額：NT$ {total_amount}，取件：{pickup_str}，歸還：{return_str}')
             
         except Exception as e:
             _logger.error(f'建立訂單失敗：{str(e)}', exc_info=True)
