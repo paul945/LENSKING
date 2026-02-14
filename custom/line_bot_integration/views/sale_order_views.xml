@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 擴充銷售訂單表單視圖 - 顯示 LINE 資訊 -->
+    <record id="view_order_form_line_info" model="ir.ui.view">
+        <field name="name">sale.order.form.line.info</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <!-- 在其他資訊頁籤中加入 LINE 資訊 -->
+            <xpath expr="//notebook/page[@name='other_information']" position="inside">
+                <group string="LINE Bot 資訊" attrs="{'invisible': [('order_source', '!=', 'line')]}">
+                    <field name="order_source"/>
+                    <field name="line_user_id"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+    
+    <!-- 擴充銷售訂單樹狀視圖 - 顯示訂單來源 -->
+    <record id="view_order_tree_line_source" model="ir.ui.view">
+        <field name="name">sale.order.tree.line.source</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_quotation_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='user_id']" position="after">
+                <field name="order_source" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+    
+    <!-- 擴充銷售訂單搜尋視圖 - 加入 LINE 篩選 -->
+    <record id="view_sales_order_filter_line" model="ir.ui.view">
+        <field name="name">sale.order.search.line</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='my_quotation']" position="after">
+                <separator/>
+                <filter string="LINE Bot 訂單" name="line_orders" domain="[('order_source', '=', 'line')]"/>
+            </xpath>
+            <xpath expr="//group[@name='group_by']" position="inside">
+                <filter string="訂單來源" name="group_by_source" context="{'group_by': 'order_source'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

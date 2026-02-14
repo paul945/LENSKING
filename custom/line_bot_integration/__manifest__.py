@@ -42,6 +42,7 @@ LINE Bot 整合模組
         'data/system_parameters.xml',
         'views/line_user_views.xml',
         'views/line_conversation_views.xml',
+        'views/sale_order_views.xml',
         'views/menu_views.xml',
     ],
     'demo': [],

@@ -458,12 +458,61 @@ class ConversationHandler(models.AbstractModel):
             if not line_user.partner_id:
                 line_user.create_partner()
             
-            # 建立訂單
-            order = self.env['sale.order'].sudo().create({
+            # 從暫存資料取得分類和器材資訊
+            temp_data = line_user.get_temp_data()
+            category = temp_data.get('category', '器材')
+            
+            # 範例器材資料（與前面的對照）
+            equipment_data = {
+                'camera_001': {'name': 'Canon R6 Mark II', 'price': 1200},
+                'camera_002': {'name': 'Sony A7IV', 'price': 1000},
+                'lens_001': {'name': 'Canon RF 24-70mm F2.8', 'price': 300},
+                'lens_002': {'name': 'Sony 24-70mm GM II', 'price': 350},
+                'flash_001': {'name': 'Godox V1', 'price': 150},
+                'flash_002': {'name': 'Profoto A1X', 'price': 200},
+            }
+            
+            equipment = equipment_data.get(equipment_id, {'name': '器材租借', 'price': 1000})
+            
+            # 查找或建立「LINE Bot 租借」產品
+            product = self.env['product.product'].sudo().search([
+                ('name', '=', equipment['name'])
+            ], limit=1)
+            
+            if not product:
+                # 建立通用產品
+                product_category = self.env['product.category'].sudo().search([
+                    ('name', '=', '租賃商品')
+                ], limit=1)
+                
+                if not product_category:
+                    product_category = self.env['product.category'].sudo().create({
+                        'name': '租賃商品'
+                    })
+                
+                product = self.env['product.product'].sudo().create({
+                    'name': equipment['name'],
+                    'list_price': equipment['price'],
+                    'type': 'service',
+                    'categ_id': product_category.id,
+                    'sale_ok': True,
+                    'purchase_ok': False,
+                })
+            
+            # 建立訂單（包含產品）
+            order_vals = {
                 'partner_id': line_user.partner_id.id,
                 'line_user_id': line_user.id,
                 'order_source': 'line',
-            })
+                'order_line': [(0, 0, {
+                    'product_id': product.id,
+                    'name': f'{equipment["name"]} - 租借（1天）',
+                    'product_uom_qty': 1,
+                    'price_unit': equipment['price'],
+                })],
+            }
+            
+            order = self.env['sale.order'].sudo().create(order_vals)
             
             # 產生付款連結
             order.action_send_payment_link()
@@ -474,6 +523,9 @@ class ConversationHandler(models.AbstractModel):
             # 發送確認訊息
             text = f"""✅ 訂單已建立！
 
+📦 租借器材：{equipment['name']}
+💰 金額：NT$ {equipment['price']}
+
 訂單編號：{order.name}
 
 💳 請點選以下連結完成付款：
@@ -482,7 +534,7 @@ class ConversationHandler(models.AbstractModel):
 付款完成後系統將自動確認您的訂單。
 
 如有任何問題，歡迎聯絡我們！
-電話：0905-527-577"""
+📞 電話：0905-527-577"""
             
             messages = [{
                 'type': 'text',
@@ -499,10 +551,10 @@ class ConversationHandler(models.AbstractModel):
                 order.id
             )
             
-            _logger.info(f'已為 LINE 用戶 {line_user.line_user_id} 建立訂單 {order.name}')
+            _logger.info(f'已為 LINE 用戶 {line_user.line_user_id} 建立訂單 {order.name}，包含產品：{equipment["name"]}')
             
         except Exception as e:
-            _logger.error(f'建立訂單失敗：{str(e)}')
+            _logger.error(f'建立訂單失敗：{str(e)}', exc_info=True)
             text = '抱歉，建立訂單時發生錯誤。請稍後再試或聯絡客服。'
             messages = [{'type': 'text', 'text': text}]
             line_client.reply_message(reply_token, messages)
