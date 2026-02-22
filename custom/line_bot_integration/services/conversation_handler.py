@@ -79,7 +79,7 @@ class ConversationHandler(models.AbstractModel):
             # 預設顯示主選單
             self._send_main_menu(line_user, reply_token)
     
-   def _handle_browsing_categories(self, line_user, message_text, reply_token):
+    def _handle_browsing_categories(self, line_user, message_text, reply_token):
     """處理瀏覽分類狀態"""
     # 檢查是否選擇了分類（使用分類 ID）
     if message_text.startswith('category:'):
