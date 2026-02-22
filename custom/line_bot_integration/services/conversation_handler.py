@@ -80,18 +80,22 @@ class ConversationHandler(models.AbstractModel):
             self._send_main_menu(line_user, reply_token)
     
     def _handle_browsing_categories(self, line_user, message_text, reply_token):
-       """處理瀏覽分類狀態"""
+    """處理瀏覽分類狀態"""
     # 檢查是否選擇了分類（使用分類 ID）
-        if message_text.startswith('category:'):
-            category_id = int(message_text.split(':')[1])
-            self._show_equipment_list_by_category_id(line_user, category_id, reply_token)
-        else:
-            # 返回主選單
-            self._send_main_menu(line_user, reply_token)
-    
+    if message_text.startswith('category:'):
+        category_id = int(message_text.split(':')[1])
+        self._show_equipment_list_by_category_id(line_user, category_id, reply_token)
+    else:
+        # 返回主選單
+        self._send_main_menu(line_user, reply_token)
     def _show_equipment_list_by_category_id(self, line_user, category_id, reply_token):
-        """顯示器材列表（從 Odoo 讀取，使用分類 ID）"""
-        line_user.conversation_state = 'browsing_equipment'
+    """顯示器材列表（從 Odoo 讀取，使用分類 ID）"""
+    line_user.conversation_state = 'browsing_equipment'
+    
+    # 儲存選擇的分類 ID
+    temp_data = line_user.get_temp_data()
+    temp_data['category_id'] = category_id
+    line_user.set_temp_data(temp_data)
     
     line_client = self.env['line.client.service']
     product_service = self.env['odoo.product.service']
