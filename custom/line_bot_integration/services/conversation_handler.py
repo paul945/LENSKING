@@ -80,8 +80,8 @@ class ConversationHandler(models.AbstractModel):
             self._send_main_menu(line_user, reply_token)
     
     def _handle_browsing_categories(self, line_user, message_text, reply_token):
-       """處理瀏覽分類狀態"""
-    # 檢查是否選擇了分類（使用分類 ID）
+        """處理瀏覽分類狀態"""
+        # 檢查是否選擇了分類（使用分類 ID）
         if message_text.startswith('category:'):
             category_id = int(message_text.split(':')[1])
             self._show_equipment_list_by_category_id(line_user, category_id, reply_token)
