@@ -80,23 +80,19 @@ class ConversationHandler(models.AbstractModel):
             self._send_main_menu(line_user, reply_token)
     
     def _handle_browsing_categories(self, line_user, message_text, reply_token):
-    """處理瀏覽分類狀態"""
-    # 檢查是否選擇了分類（使用分類 ID）
-    if message_text.startswith('category:'):
-        category_id = int(message_text.split(':')[1])
-        self._show_equipment_list_by_id(line_user, category_id, reply_token)
-    elif message_text in ['相機機身', '鏡頭', '閃光燈', '配件']:
-        # 向下相容舊版本
-        self._show_equipment_list(line_user, message_text, reply_token)
-    else:
-        self._send_category_menu_v3(line_user, reply_token)
+        """處理瀏覽分類狀態"""
+        # 檢查是否選擇了分類
+        if message_text in ['相機機身', '鏡頭', '閃光燈', '配件']:
+            self._show_equipment_list(line_user, message_text, reply_token)
+        else:
+            self._send_category_menu(line_user, reply_token)
     
     def _handle_browsing_equipment(self, line_user, message_text, reply_token):
         """處理瀏覽器材狀態"""
         # 檢查是否選擇了器材（加入購物車）
         if message_text.startswith('加入購物車:'):
             equipment_id = message_text.split(':')[1]
-            self._add_to_cart_v3(line_user, equipment_id, reply_token)
+            self._add_to_cart(line_user, equipment_id, reply_token)
         elif message_text == '查看購物車':
             self._show_cart(line_user, reply_token)
         elif message_text == '返回分類':
@@ -168,7 +164,7 @@ class ConversationHandler(models.AbstractModel):
     def _start_browsing(self, line_user, reply_token):
         """開始瀏覽器材"""
         line_user.conversation_state = 'browsing_categories'
-        self._send_category_menu_v3(line_user, reply_token)
+        self._send_category_menu(line_user, reply_token)
     
     def _send_category_menu(self, line_user, reply_token):
         """發送器材分類選單"""
@@ -1055,245 +1051,3 @@ https://www.lensking.com.tw
             'text',
             text
         )
-    def _send_category_menu_v3(self, line_user, reply_token):
-        """發送器材分類選單 v3（從 Odoo 讀取）"""
-        line_user.conversation_state = 'browsing_categories'
-        
-        line_client = self.env['line.client.service']
-        product_service = self.env['odoo.product.service']
-        
-        # 從 Odoo 取得主要分類
-        categories = product_service.get_main_categories()
-        
-        if not categories:
-            # 降級到舊版本
-            self._send_category_menu(line_user, reply_token)
-            return
-        
-        # 定義分類樣式
-        category_styles = {
-            'Canon 相機': {'emoji': '📷', 'color': '#667eea'},
-            'Canon 鏡頭': {'emoji': '🔭', 'color': '#764ba2'},
-            'Sony 無反相機': {'emoji': '📸', 'color': '#f093fb'},
-            'Sony 鏡頭': {'emoji': '🎯', 'color': '#4facfe'},
-            '儲存與電力': {'emoji': '🔋', 'color': '#43e97b'},
-        }
-        
-        bubbles = []
-        colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a']
-        
-        for idx, cat in enumerate(categories):
-            style = category_styles.get(cat['name'], {
-                'emoji': '📦',
-                'color': colors[idx % len(colors)]
-            })
-            
-            bubble = {
-                'type': 'bubble',
-                'size': 'micro',
-                'hero': {
-                    'type': 'box',
-                    'layout': 'vertical',
-                    'contents': [{
-                        'type': 'text',
-                        'text': style['emoji'],
-                        'size': '4xl',
-                        'align': 'center',
-                        'margin': 'md'
-                    }],
-                    'backgroundColor': style['color'],
-                    'paddingAll': '20px'
-                },
-                'body': {
-                    'type': 'box',
-                    'layout': 'vertical',
-                    'contents': [{
-                        'type': 'text',
-                        'text': cat['name'],
-                        'weight': 'bold',
-                        'size': 'md',
-                        'wrap': True,
-                        'align': 'center'
-                    }],
-                    'paddingAll': '13px'
-                },
-                'footer': {
-                    'type': 'box',
-                    'layout': 'vertical',
-                    'contents': [{
-                        'type': 'button',
-                        'action': {
-                            'type': 'message',
-                            'label': '查看',
-                            'text': f"category:{cat['id']}"
-                        },
-                        'style': 'primary',
-                        'color': style['color']
-                    }]
-                }
-            }
-            bubbles.append(bubble)
-        
-        messages = [{
-            'type': 'flex',
-            'altText': '器材分類',
-            'contents': {'type': 'carousel', 'contents': bubbles}
-        }]
-        
-        line_client.reply_message(reply_token, messages)
-        self.env['line.conversation'].log_outgoing_message(line_user, 'flex', '器材分類選單')
-    
-    def _show_equipment_list_by_id(self, line_user, category_id, reply_token):
-        """顯示器材列表（使用分類 ID，從 Odoo 讀取）"""
-        line_user.conversation_state = 'browsing_equipment'
-        
-        temp_data = line_user.get_temp_data()
-        temp_data['category_id'] = category_id
-        line_user.set_temp_data(temp_data)
-        
-        line_client = self.env['line.client.service']
-        product_service = self.env['odoo.product.service']
-        
-        # 從 Odoo 讀取產品
-        equipment_list = product_service.get_products_by_category(category_id, limit=20)
-        
-        if not equipment_list:
-            text = '抱歉，此分類目前沒有可租借的器材。'
-            messages = [{
-                'type': 'text',
-                'text': text,
-                'quickReply': {'items': [{'type': 'action', 'action': {'type': 'message', 'label': '返回分類', 'text': '租借器材'}}]}
-            }]
-            line_client.reply_message(reply_token, messages)
-            return
-        
-        # 建立器材卡片
-        bubbles = []
-        for eq in equipment_list[:10]:  # 限制 10 個
-            has_stock = eq['qty'] > 0
-            
-            bubble = {
-                'type': 'bubble',
-                'body': {
-                    'type': 'box',
-                    'layout': 'vertical',
-                    'contents': [
-                        {'type': 'text', 'text': eq['name'], 'weight': 'bold', 'size': 'md', 'wrap': True},
-                        {
-                            'type': 'box',
-                            'layout': 'baseline',
-                            'margin': 'md',
-                            'contents': [
-                                {'type': 'text', 'text': f"NT$ {int(eq['price'])}", 'size': 'xl', 'color': '#FF6B6B', 'weight': 'bold'},
-                                {'type': 'text', 'text': '/天', 'size': 'sm', 'color': '#999999'}
-                            ]
-                        },
-                        {
-                            'type': 'text',
-                            'text': f"庫存：{int(eq['qty'])} 台" if has_stock else "暫無庫存",
-                            'size': 'sm',
-                            'color': '#999999' if has_stock else '#FF6B6B',
-                            'margin': 'md'
-                        }
-                    ]
-                },
-                'footer': {
-                    'type': 'box',
-                    'layout': 'vertical',
-                    'contents': [{
-                        'type': 'button',
-                        'action': {'type': 'message', 'label': '🛒 加入購物車' if has_stock else '暫無庫存', 'text': f"加入購物車:{eq['id']}"},
-                        'style': 'primary',
-                        'color': '#667eea' if has_stock else '#CCCCCC'
-                    }]
-                }
-            }
-            
-            # 加入圖片
-            if eq.get('image_url'):
-                bubble['hero'] = {
-                    'type': 'image',
-                    'url': eq['image_url'],
-                    'size': 'full',
-                    'aspectRatio': '20:13',
-                    'aspectMode': 'cover'
-                }
-            
-            bubbles.append(bubble)
-        
-        cart = temp_data.get('cart', [])
-        category = self.env['product.category'].sudo().browse(category_id)
-        
-        messages = [
-            {'type': 'flex', 'altText': f'{category.name}列表', 'contents': {'type': 'carousel', 'contents': bubbles}},
-            {
-                'type': 'text',
-                'text': f'📦 {category.name}',
-                'quickReply': {
-                    'items': [
-                        {'type': 'action', 'action': {'type': 'message', 'label': f'🛒 購物車 ({len(cart)})' if cart else '🛒 購物車', 'text': '查看購物車'}},
-                        {'type': 'action', 'action': {'type': 'message', 'label': '◀️ 返回分類', 'text': '租借器材'}}
-                    ]
-                }
-            }
-        ]
-        
-        line_client.reply_message(reply_token, messages)
-        self.env['line.conversation'].log_outgoing_message(line_user, 'flex', f'{category.name}器材列表')
-    
-    def _add_to_cart_v3(self, line_user, equipment_id, reply_token):
-        """加入購物車 v3（使用真實產品）"""
-        line_client = self.env['line.client.service']
-        product_service = self.env['odoo.product.service']
-        
-        # 從 Odoo 讀取產品
-        equipment = product_service.get_product_by_id(int(equipment_id))
-        
-        if not equipment:
-            # 降級到舊版本
-            self._add_to_cart(line_user, equipment_id, reply_token)
-            return
-        
-        if equipment['qty'] <= 0:
-            messages = [{'type': 'text', 'text': f'抱歉，{equipment["name"]} 目前沒有庫存。'}]
-            line_client.reply_message(reply_token, messages)
-            return
-        
-        temp_data = line_user.get_temp_data()
-        cart = temp_data.get('cart', [])
-        
-        existing = next((item for item in cart if item['id'] == equipment_id), None)
-        
-        if existing:
-            existing['quantity'] += 1
-            action_text = '已增加數量'
-        else:
-            cart.append({'id': equipment_id, 'name': equipment['name'], 'price': equipment['price'], 'quantity': 1})
-            action_text = '已加入購物車'
-        
-        temp_data['cart'] = cart
-        line_user.set_temp_data(temp_data)
-        
-        total = sum(item['price'] * item['quantity'] for item in cart)
-        
-        text = f"""✅ {action_text}！
-
-📦 {equipment['name']}
-💰 NT$ {int(equipment['price'])}/天
-
-🛒 購物車：{len(cart)} 項商品
-💵 小計：NT$ {int(total)}"""
-        
-        messages = [{
-            'type': 'text',
-            'text': text,
-            'quickReply': {
-                'items': [
-                    {'type': 'action', 'action': {'type': 'message', 'label': '🛒 查看購物車', 'text': '查看購物車'}},
-                    {'type': 'action', 'action': {'type': 'message', 'label': '➕ 繼續選購', 'text': '租借器材'}}
-                ]
-            }
-        }]
-        
-        line_client.reply_message(reply_token, messages)
-        self.env['line.conversation'].log_outgoing_message(line_user, 'text', text)
