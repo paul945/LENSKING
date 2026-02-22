@@ -79,191 +79,13 @@ class ConversationHandler(models.AbstractModel):
             # 預設顯示主選單
             self._send_main_menu(line_user, reply_token)
     
-   def _handle_browsing_categories(self, line_user, message_text, reply_token):
-    """處理瀏覽分類狀態"""
-    # 檢查是否選擇了分類（使用分類 ID）
-    if message_text.startswith('category:'):
-        category_id = int(message_text.split(':')[1])
-        self._show_equipment_list_by_category_id(line_user, category_id, reply_token)
-    else:
-        # 返回主選單
-        self._send_main_menu(line_user, reply_token)
-    def _show_equipment_list_by_category_id(self, line_user, category_id, reply_token):
-    """顯示器材列表（從 Odoo 讀取，使用分類 ID）"""
-    line_user.conversation_state = 'browsing_equipment'
-    
-    # 儲存選擇的分類 ID
-    temp_data = line_user.get_temp_data()
-    temp_data['category_id'] = category_id
-    line_user.set_temp_data(temp_data)
-    
-    line_client = self.env['line.client.service']
-    product_service = self.env['odoo.product.service']
-    
-    # 從 Odoo 讀取產品
-    equipment_list = product_service.get_products_by_category(category_id, limit=20)
-    
-    if not equipment_list:
-        text = '抱歉，此分類目前沒有可租借的器材。'
-        quick_reply_items = [{
-            'type': 'action',
-            'action': {
-                'type': 'message',
-                'label': '◀️ 返回分類',
-                'text': '租借器材'
-            }
-        }]
-        messages = [{
-            'type': 'text',
-            'text': text,
-            'quickReply': {'items': quick_reply_items}
-        }]
-        line_client.reply_message(reply_token, messages)
-        return
-    
-    # 建立器材卡片（含圖片）
-    bubbles = []
-    for eq in equipment_list:
-        # 判斷庫存狀態
-        has_stock = eq['qty'] > 0
-        stock_text = f"庫存：{int(eq['qty'])} 台" if has_stock else "暫無庫存"
-        stock_color = '#999999' if has_stock else '#FF6B6B'
-        
-        bubble = {
-            'type': 'bubble',
-            'body': {
-                'type': 'box',
-                'layout': 'vertical',
-                'contents': []
-            },
-            'footer': {
-                'type': 'box',
-                'layout': 'vertical',
-                'contents': [
-                    {
-                        'type': 'button',
-                        'action': {
-                            'type': 'message',
-                            'label': '🛒 加入購物車' if has_stock else '暫無庫存',
-                            'text': f"加入購物車:{eq['id']}"
-                        },
-                        'style': 'primary',
-                        'color': '#667eea' if has_stock else '#CCCCCC'
-                    }
-                ]
-            }
-        }
-        
-        # 如果有圖片，加入 hero
-        if eq.get('image_url'):
-            bubble['hero'] = {
-                'type': 'image',
-                'url': eq['image_url'],
-                'size': 'full',
-                'aspectRatio': '20:13',
-                'aspectMode': 'cover'
-            }
-        
-        # 產品資訊
-        bubble['body']['contents'] = [
-            {
-                'type': 'text',
-                'text': eq['name'],
-                'weight': 'bold',
-                'size': 'md',
-                'wrap': True
-            },
-            {
-                'type': 'box',
-                'layout': 'baseline',
-                'margin': 'md',
-                'contents': [
-                    {
-                        'type': 'text',
-                        'text': f"NT$ {int(eq['price'])}",
-                        'size': 'xl',
-                        'color': '#FF6B6B',
-                        'weight': 'bold'
-                    },
-                    {
-                        'type': 'text',
-                        'text': '/天',
-                        'size': 'sm',
-                        'color': '#999999'
-                    }
-                ]
-            },
-            {
-                'type': 'text',
-                'text': stock_text,
-                'size': 'sm',
-                'color': stock_color,
-                'margin': 'md'
-            }
-        ]
-        
-        bubbles.append(bubble)
-    
-    # 限制 Carousel 最多 10 個 bubble
-    if len(bubbles) > 10:
-        bubbles = bubbles[:10]
-    
-    flex_contents = {
-        'type': 'carousel',
-        'contents': bubbles
-    }
-    
-    # 取得目前購物車數量
-    cart_items = temp_data.get('cart', [])
-    cart_count = len(cart_items)
-    
-    # 建立快速回覆按鈕
-    quick_reply_items = [
-        {
-            'type': 'action',
-            'action': {
-                'type': 'message',
-                'label': '🛒 查看購物車' + (f' ({cart_count})' if cart_count > 0 else ''),
-                'text': '查看購物車'
-            }
-        },
-        {
-            'type': 'action',
-            'action': {
-                'type': 'message',
-                'label': '◀️ 返回分類',
-                'text': '租借器材'
-            }
-        }
-    ]
-    
-    # 取得分類名稱
-    category = self.env['product.category'].sudo().browse(category_id)
-    category_name = category.name if category.exists() else '器材'
-    
-    messages = [
-        {
-            'type': 'flex',
-            'altText': f'{category_name}列表',
-            'contents': flex_contents
-        },
-        {
-            'type': 'text',
-            'text': f'📦 {category_name}',
-            'quickReply': {
-                'items': quick_reply_items
-            }
-        }
-    ]
-    
-    line_client.reply_message(reply_token, messages)
-    
-    # 記錄發送的訊息
-    self.env['line.conversation'].log_outgoing_message(
-        line_user,
-        'flex',
-        f'{category_name}器材列表'
-    )
+    def _handle_browsing_categories(self, line_user, message_text, reply_token):
+        """處理瀏覽分類狀態"""
+        # 檢查是否選擇了分類
+        if message_text in ['相機機身', '鏡頭', '閃光燈', '配件']:
+            self._show_equipment_list(line_user, message_text, reply_token)
+        else:
+            self._send_category_menu(line_user, reply_token)
     
     def _handle_browsing_equipment(self, line_user, message_text, reply_token):
         """處理瀏覽器材狀態"""
@@ -344,115 +166,199 @@ class ConversationHandler(models.AbstractModel):
         line_user.conversation_state = 'browsing_categories'
         self._send_category_menu(line_user, reply_token)
     
-def _send_category_menu(self, line_user, reply_token):
-    """發送器材分類選單（從 Odoo 動態讀取）"""
-    line_user.conversation_state = 'browsing_categories'
-    
-    line_client = self.env['line.client.service']
-    product_service = self.env['odoo.product.service']
-    
-    # 從 Odoo 取得主要分類
-    categories = product_service.get_main_categories()
-    
-    if not categories:
-        # 如果沒有分類，顯示錯誤訊息
-        text = '抱歉，目前系統無法載入器材分類。請稍後再試。'
-        messages = [{'type': 'text', 'text': text}]
-        line_client.reply_message(reply_token, messages)
-        return
-    
-    # 定義分類的 emoji 和顏色
-    category_styles = {
-        'Canon 相機': {'emoji': '📷', 'color': '#667eea'},
-        'Canon 鏡頭': {'emoji': '🔭', 'color': '#764ba2'},
-        'Sony 無反相機': {'emoji': '📸', 'color': '#f093fb'},
-        'Sony 鏡頭': {'emoji': '🎯', 'color': '#4facfe'},
-        '儲存與電力': {'emoji': '🔋', 'color': '#43e97b'},
-    }
-    
-    # 建立分類卡片
-    bubbles = []
-    colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a']
-    
-    for idx, cat in enumerate(categories):
-        category_name = cat['name']
-        style = category_styles.get(category_name, {
-            'emoji': '📦',
-            'color': colors[idx % len(colors)]
-        })
+    def _send_category_menu(self, line_user, reply_token):
+        """發送器材分類選單"""
+        line_client = self.env['line.client.service']
         
-        bubble = {
-            'type': 'bubble',
-            'size': 'micro',
-            'hero': {
-                'type': 'box',
-                'layout': 'vertical',
-                'contents': [
-                    {
-                        'type': 'text',
-                        'text': style['emoji'],
-                        'size': '4xl',
-                        'align': 'center',
-                        'margin': 'md'
+        # Flex Message - 器材分類卡片
+        flex_contents = {
+            'type': 'carousel',
+            'contents': [
+                # 相機機身
+                {
+                    'type': 'bubble',
+                    'hero': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '📷',
+                                'size': '5xl',
+                                'align': 'center',
+                                'color': '#ffffff'
+                            }
+                        ],
+                        'backgroundColor': '#667eea',
+                        'paddingAll': '20px'
+                    },
+                    'body': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '相機機身',
+                                'weight': 'bold',
+                                'size': 'xl',
+                                'align': 'center'
+                            },
+                            {
+                                'type': 'text',
+                                'text': 'Canon, Sony 等品牌',
+                                'size': 'sm',
+                                'color': '#999999',
+                                'align': 'center',
+                                'margin': 'md'
+                            }
+                        ]
+                    },
+                    'footer': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'button',
+                                'action': {
+                                    'type': 'message',
+                                    'label': '查看器材',
+                                    'text': '相機機身'
+                                },
+                                'style': 'primary',
+                                'color': '#667eea'
+                            }
+                        ]
                     }
-                ],
-                'backgroundColor': style['color'],
-                'paddingAll': '20px'
-            },
-            'body': {
-                'type': 'box',
-                'layout': 'vertical',
-                'contents': [
-                    {
-                        'type': 'text',
-                        'text': category_name,
-                        'weight': 'bold',
-                        'size': 'md',
-                        'wrap': True,
-                        'align': 'center'
+                },
+                # 鏡頭
+                {
+                    'type': 'bubble',
+                    'hero': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '🔭',
+                                'size': '5xl',
+                                'align': 'center',
+                                'color': '#ffffff'
+                            }
+                        ],
+                        'backgroundColor': '#764ba2',
+                        'paddingAll': '20px'
+                    },
+                    'body': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '鏡頭',
+                                'weight': 'bold',
+                                'size': 'xl',
+                                'align': 'center'
+                            },
+                            {
+                                'type': 'text',
+                                'text': '廣角、標準、望遠鏡頭',
+                                'size': 'sm',
+                                'color': '#999999',
+                                'align': 'center',
+                                'margin': 'md'
+                            }
+                        ]
+                    },
+                    'footer': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'button',
+                                'action': {
+                                    'type': 'message',
+                                    'label': '查看器材',
+                                    'text': '鏡頭'
+                                },
+                                'style': 'primary',
+                                'color': '#764ba2'
+                            }
+                        ]
                     }
-                ],
-                'spacing': 'sm',
-                'paddingAll': '13px'
-            },
-            'footer': {
-                'type': 'box',
-                'layout': 'vertical',
-                'contents': [
-                    {
-                        'type': 'button',
-                        'action': {
-                            'type': 'message',
-                            'label': '查看',
-                            'text': f"category:{cat['id']}"  # 使用分類 ID
-                        },
-                        'style': 'primary',
-                        'color': style['color']
+                },
+                # 閃光燈
+                {
+                    'type': 'bubble',
+                    'hero': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '⚡',
+                                'size': '5xl',
+                                'align': 'center',
+                                'color': '#ffffff'
+                            }
+                        ],
+                        'backgroundColor': '#f093fb',
+                        'paddingAll': '20px'
+                    },
+                    'body': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'text',
+                                'text': '閃光燈',
+                                'weight': 'bold',
+                                'size': 'xl',
+                                'align': 'center'
+                            },
+                            {
+                                'type': 'text',
+                                'text': '機頂閃、棚燈',
+                                'size': 'sm',
+                                'color': '#999999',
+                                'align': 'center',
+                                'margin': 'md'
+                            }
+                        ]
+                    },
+                    'footer': {
+                        'type': 'box',
+                        'layout': 'vertical',
+                        'contents': [
+                            {
+                                'type': 'button',
+                                'action': {
+                                    'type': 'message',
+                                    'label': '查看器材',
+                                    'text': '閃光燈'
+                                },
+                                'style': 'primary',
+                                'color': '#f093fb'
+                            }
+                        ]
                     }
-                ]
-            }
+                },
+            ]
         }
-        bubbles.append(bubble)
-    
-    flex_contents = {
-        'type': 'carousel',
-        'contents': bubbles
-    }
-    
-    messages = [{
-        'type': 'flex',
-        'altText': '器材分類',
-        'contents': flex_contents
-    }]
-    
-    line_client.reply_message(reply_token, messages)
-    
-    # 記錄發送的訊息
-    self.env['line.conversation'].log_outgoing_message(
-        line_user,
-        'flex',
-        '器材分類選單'
-    )
+        
+        messages = [{
+            'type': 'flex',
+            'altText': '器材分類選單',
+            'contents': flex_contents
+        }]
+        
+        line_client.reply_message(reply_token, messages)
+        
+        # 記錄發送的訊息
+        self.env['line.conversation'].log_outgoing_message(
+            line_user,
+            'flex',
+            '器材分類選單'
+        )
     
     def _show_equipment_list(self, line_user, category, reply_token):
         """顯示器材列表（範例資料）"""
@@ -593,98 +499,98 @@ def _send_category_menu(self, line_user, reply_token):
         )
     
     def _add_to_cart(self, line_user, equipment_id, reply_token):
-    """加入購物車（使用真實產品 ID）"""
-    line_client = self.env['line.client.service']
-    product_service = self.env['odoo.product.service']
-    
-    # 從 Odoo 讀取產品
-    equipment = product_service.get_product_by_id(int(equipment_id))
-    
-    if not equipment:
-        text = '抱歉，找不到此器材。'
-        messages = [{'type': 'text', 'text': text}]
-        line_client.reply_message(reply_token, messages)
-        return
-    
-    # 檢查庫存
-    if equipment['qty'] <= 0:
-        text = f'抱歉，{equipment["name"]} 目前沒有庫存。'
-        messages = [{'type': 'text', 'text': text}]
-        line_client.reply_message(reply_token, messages)
-        return
-    
-    # 取得購物車
-    temp_data = line_user.get_temp_data()
-    cart = temp_data.get('cart', [])
-    
-    # 檢查是否已在購物車中
-    existing_item = next((item for item in cart if item['id'] == equipment_id), None)
-    
-    if existing_item:
-        # 已存在，增加數量
-        existing_item['quantity'] += 1
-        action_text = '已增加數量'
-    else:
-        # 新增到購物車
-        cart.append({
-            'id': equipment_id,
-            'name': equipment['name'],
-            'price': equipment['price'],
-            'quantity': 1
-        })
-        action_text = '已加入購物車'
-    
-    temp_data['cart'] = cart
-    line_user.set_temp_data(temp_data)
-    
-    # 計算總價
-    total = sum(item['price'] * item['quantity'] for item in cart)
-    
-    # 發送確認訊息
-    quick_reply_items = [
-        {
-            'type': 'action',
-            'action': {
-                'type': 'message',
-                'label': '🛒 查看購物車',
-                'text': '查看購物車'
-            }
-        },
-        {
-            'type': 'action',
-            'action': {
-                'type': 'message',
-                'label': '➕ 繼續選購',
-                'text': '租借器材'
-            }
+        """加入購物車"""
+        line_client = self.env['line.client.service']
+        
+        # 範例器材資料
+        equipment_data = {
+            'camera_001': {'name': 'Canon R6 Mark II', 'price': 1200},
+            'camera_002': {'name': 'Sony A7IV', 'price': 1000},
+            'lens_001': {'name': 'Canon RF 24-70mm F2.8', 'price': 300},
+            'lens_002': {'name': 'Sony 24-70mm GM II', 'price': 350},
+            'flash_001': {'name': 'Godox V1', 'price': 150},
+            'flash_002': {'name': 'Profoto A1X', 'price': 200},
         }
-    ]
-    
-    text = f"""✅ {action_text}！
+        
+        equipment = equipment_data.get(equipment_id)
+        if not equipment:
+            text = '抱歉，找不到此器材。'
+            messages = [{'type': 'text', 'text': text}]
+            line_client.reply_message(reply_token, messages)
+            return
+        
+        # 取得購物車
+        temp_data = line_user.get_temp_data()
+        cart = temp_data.get('cart', [])
+        
+        # 檢查是否已在購物車中
+        existing_item = next((item for item in cart if item['id'] == equipment_id), None)
+        
+        if existing_item:
+            # 已存在，增加數量
+            existing_item['quantity'] += 1
+            action_text = '已增加數量'
+        else:
+            # 新增到購物車
+            cart.append({
+                'id': equipment_id,
+                'name': equipment['name'],
+                'price': equipment['price'],
+                'quantity': 1
+            })
+            action_text = '已加入購物車'
+        
+        temp_data['cart'] = cart
+        line_user.set_temp_data(temp_data)
+        
+        # 計算總價
+        total = sum(item['price'] * item['quantity'] for item in cart)
+        
+        # 發送確認訊息
+        quick_reply_items = [
+            {
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '🛒 查看購物車',
+                    'text': '查看購物車'
+                }
+            },
+            {
+                'type': 'action',
+                'action': {
+                    'type': 'message',
+                    'label': '➕ 繼續選購',
+                    'text': '租借器材'
+                }
+            }
+        ]
+        
+        text = f"""✅ {action_text}！
 
 📦 {equipment['name']}
-💰 NT$ {int(equipment['price'])}/天
+💰 NT$ {equipment['price']}/天
 
 🛒 購物車：{len(cart)} 項商品
-💵 小計：NT$ {int(total)}"""
+💵 小計：NT$ {total}"""
+        
+        messages = [{
+            'type': 'text',
+            'text': text,
+            'quickReply': {
+                'items': quick_reply_items
+            }
+        }]
+        
+        line_client.reply_message(reply_token, messages)
+        
+        # 記錄發送的訊息
+        self.env['line.conversation'].log_outgoing_message(
+            line_user,
+            'text',
+            text
+        )
     
-    messages = [{
-        'type': 'text',
-        'text': text,
-        'quickReply': {
-            'items': quick_reply_items
-        }
-    }]
-    
-    line_client.reply_message(reply_token, messages)
-    
-    # 記錄發送的訊息
-    self.env['line.conversation'].log_outgoing_message(
-        line_user,
-        'text',
-        text
-    )
-
     def _show_cart(self, line_user, reply_token):
         """顯示購物車"""
         line_client = self.env['line.client.service']
